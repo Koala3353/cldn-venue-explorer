@@ -1,0 +1,521 @@
+<!DOCTYPE html>
+<html>
+<head>
+<base target="_top">
+<meta charset="utf-8">
+<style>
+  :root {
+    --dark: #274e13; --green: #38761d; --light: #d9ead3; --tint: #f1f7ee;
+    --text: #1f2a1a; --muted: #5f6b5a; --line: #c9d8c1;
+    --ok: #1e7d32; --ok-bg: #e6f4e7; --warn: #8a5300; --warn-bg: #fdf1dc;
+    --bad: #b3261e; --bad-bg: #fbe9e7;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 13px/1.4 'Quattrocento Sans', Arial, sans-serif; color: var(--text); }
+  form { padding: 4px 18px 84px; }
+  fieldset { border: 1px solid var(--line); border-radius: 8px; margin: 12px 0; padding: 10px 14px 12px; }
+  legend { font-weight: 700; color: var(--dark); padding: 0 6px; }
+  details > summary { cursor: pointer; font-weight: 700; color: var(--dark); list-style: none; }
+  details > summary::-webkit-details-marker { display: none; }
+  details > summary::before { content: '▸ '; }
+  details[open] > summary::before { content: '▾ '; }
+  .saved { font-weight: 400; color: var(--muted); }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 12px; margin-top: 8px; }
+  .grid .wide { grid-column: 1 / -1; }
+  label { display: block; font-size: 12px; font-weight: 700; color: var(--muted); }
+  label span.req { color: var(--bad); }
+  input[type=text], input[type=email], input[type=tel], input[type=number],
+  input[type=date], input[type=time], input[list] {
+    width: 100%; margin-top: 3px; padding: 7px 8px; border: 1px solid var(--line); border-radius: 6px;
+    font: inherit; background: var(--tint);
+  }
+  input:focus { outline: 2px solid var(--green); outline-offset: 0; background: #fff; }
+  .checks { display: flex; flex-wrap: wrap; gap: 6px 18px; margin-top: 6px; }
+  .checks.col { flex-direction: column; gap: 6px; }
+  select, textarea { width: 100%; margin-top: 3px; padding: 7px 8px; border: 1px solid var(--line); border-radius: 6px; font: inherit; background: var(--tint); }
+  .grid .wide > input[type=text] { margin-top: 6px; }
+  #intake.late { color: var(--warn); font-weight: 700; }
+  .checks label { display: flex; align-items: center; gap: 6px; font-weight: 400; color: var(--text); font-size: 13px; }
+  #status { border-radius: 8px; padding: 10px 12px; margin: 12px 0 0; border: 1px solid var(--line); background: #fafafa; }
+  #status.free { background: var(--ok-bg); border-color: #b9dfbc; }
+  #status.conflict, #status.error { background: var(--bad-bg); border-color: #f2c4bf; }
+  #status.unknown, #status.incomplete, #status.checking { background: var(--warn-bg); border-color: #f0d9ad; }
+  #status strong { display: block; margin-bottom: 2px; }
+  #status.free strong { color: var(--ok); }
+  #status.conflict strong, #status.error strong { color: var(--bad); }
+  #status ul { margin: 4px 0 0; padding-left: 18px; }
+  .free-list button { margin: 4px 6px 0 0; padding: 3px 8px; border: 1px solid #b9dfbc; border-radius: 12px;
+    background: #fff; font: inherit; font-size: 12px; cursor: pointer; }
+  .actions { position: fixed; left: 0; right: 0; bottom: 0; display: flex; gap: 8px; justify-content: flex-end;
+    padding: 12px 18px; background: #fff; border-top: 1px solid var(--line); }
+  .btn { padding: 8px 16px; border-radius: 6px; border: 1px solid var(--line); background: #fff;
+    font: inherit; font-weight: 700; cursor: pointer; text-decoration: none; color: var(--text); }
+  .btn.primary { background: var(--green); border-color: var(--green); color: #fff; }
+  .btn.danger { background: var(--bad); border-color: var(--bad); color: #fff; }
+  .btn:disabled { opacity: .6; cursor: wait; }
+  #result { display: none; padding: 4px 18px 84px; }
+  #result textarea { width: 100%; height: 110px; margin-top: 6px; font: 11px/1.4 monospace; padding: 8px;
+    border: 1px solid var(--line); border-radius: 6px; resize: none; }
+  #error { color: var(--bad); margin: 10px 0 0; display: none; }
+  input[aria-invalid="true"] { border-color: var(--bad) !important; box-shadow: 0 0 0 3px var(--bad-bg); }
+  .profile-bar { display: flex; gap: 8px; align-items: end; margin: 12px 0 4px; }
+  .profile-bar label { flex: 1; }
+  .profile-bar select { width: 100%; margin-top: 3px; padding: 7px 8px; border: 1px solid var(--line);
+    border-radius: 6px; font: inherit; background: #fff; }
+  .btn.small { padding: 7px 10px; font-size: 12px; }
+  .btn.link { border: none; background: none; color: var(--bad); padding: 7px 4px; }
+  .note { font-size: 11px; color: var(--muted); margin: 2px 0 0; }
+</style>
+</head>
+<body>
+<form id="request" autocomplete="off">
+  <div class="profile-bar">
+    <label>Requesting for
+      <select id="profileSelect"></select>
+    </label>
+    <button type="button" class="btn small" id="newProfile">+ New profile</button>
+    <button type="button" class="btn link small" id="deleteProfile">Delete</button>
+  </div>
+  <p class="note" id="profileNote"></p>
+  <details id="requesterBox">
+    <summary>Requester details <span class="saved" id="requesterSummary"></span></summary>
+    <div class="grid">
+      <div class="wide"><label>Profile name<input type="text" id="profileName" placeholder="e.g. Ateneo MEA – David"></label></div>
+      <div class="wide"><label>Sponsoring office, department or organization <span class="req">*</span><input type="text" name="organization"></label></div>
+      <div><label>Point person <span class="req">*</span><input type="text" name="contactPerson" placeholder="Last Name, First Name"></label></div>
+      <div><label>Local no. (optional)<input type="text" name="localNo" inputmode="numeric" maxlength="15" placeholder="Leave blank if none"></label></div>
+      <div><label>Mobile no. <span class="req">*</span><input type="tel" name="contactNumber" placeholder="9171234567"></label></div>
+      <div><label>Email address <span class="req">*</span><input type="email" name="email" placeholder="@obf.ateneo.edu or @ateneo.edu"></label></div>
+      <div class="wide"><label>Activity approved by <span class="req">*</span></label><div class="checks" id="approvedByBox"></div>
+        <input type="text" name="approvedByOther" placeholder="Other, e.g. Org Moderator"></div>
+      <div class="wide"><label>Name of approver <span class="req">*</span><input type="text" name="approverName" placeholder="e.g. Dela Cruz, Juan"></label></div>
+    </div>
+  </details>
+
+  <fieldset>
+    <legend>Event</legend>
+    <div class="grid">
+      <div class="wide"><label>Facility requested <span class="req">*</span><input list="venues" name="venue" placeholder="Start typing, e.g. CTC 205"></label></div>
+      <div><label>Date <span class="req">*</span><input type="date" name="date"></label></div>
+      <div><label>Number of participants <span class="req">*</span><input type="number" name="participants" min="1"></label></div>
+      <div><label>Start time <span class="req">*</span><input type="time" name="startTime"></label></div>
+      <div><label>End time <span class="req">*</span><input type="time" name="endTime"></label></div>
+      <div class="wide"><label>Title of event or activity <span class="req">*</span><input type="text" name="eventTitle" maxlength="200"></label></div>
+      <div class="wide"><label>Nature of event <span class="req">*</span><select name="nature" id="natureSelect"></select></label>
+        <input type="text" name="natureOther" placeholder="Type the nature of the event" style="display:none"></div>
+      <div class="wide"><label>Check all that apply <span class="req">*</span></label><div class="checks col" id="conditionsBox"></div></div>
+      <div class="wide"><label>Group dynamics or interactive activities <span class="req">*</span><textarea name="activityDetails" rows="2" placeholder="Describe them, or write N/A"></textarea></label></div>
+      <div class="wide"><label>AV equipment needs <span class="req">*</span></label><div class="checks" id="equipment"></div>
+        <input type="text" name="equipmentOther" placeholder="Other equipment, e.g. Microphone"></div>
+      <div class="wide"><label>Proof of approval (Drive link) <span class="req">*</span><input type="text" name="proofLink" placeholder="https://drive.google.com/..."></label>
+        <p class="note">Upload a screenshot of the approval to Google Drive, share it so CFMO can open it, then paste the link.</p></div>
+    </div>
+    <p class="note" id="intake"></p>
+    <div id="status" class="incomplete"><strong>Availability</strong><span id="statusText">Pick a venue, date, start and end time.</span></div>
+  </fieldset>
+  <p id="error"></p>
+  <div class="actions">
+    <button type="button" class="btn" onclick="google.script.host.close()">Cancel</button>
+    <button type="submit" class="btn primary" id="generate">Generate link</button>
+  </div>
+</form>
+
+<div id="result">
+  <fieldset>
+    <legend>Prefilled link ready</legend>
+    <p id="resultNote"></p>
+    <p class="note">Answer the Conforme question at the end of the form yourself. If the form shows old answers instead of these, click Clear form at the bottom of the form, then open this link again.</p>
+    <a class="btn primary" id="openForm" target="_blank" rel="noopener">Open the request form</a>
+    <textarea id="url" readonly></textarea>
+    <button type="button" class="btn" id="copy">Copy link</button>
+  </fieldset>
+  <div class="actions">
+    <button type="button" class="btn" id="back">Edit request</button>
+    <button type="button" class="btn" onclick="google.script.host.close()">Close</button>
+  </div>
+</div>
+
+<datalist id="venues"></datalist>
+
+<?!= include_('RequestShared') ?>
+<script>
+  var DATA = <?!= initialJson ?>;
+  var F = RF.init(DATA.form);
+  var CH = DATA.form.choices;
+  var form = document.getElementById('request');
+  var venueDay = DATA.venueDay;
+  var loadSeq = 0;
+  var loadTimer = null;
+
+  function el(id) { return document.getElementById(id); }
+  function esc(text) { var d = document.createElement('div'); d.textContent = text; return d.innerHTML; }
+  function key(text) { return String(text || '').trim().toLowerCase().replace(/\s+/g, ' '); }
+
+  // --- requester profiles ---
+  // Saved to the Google account. When the script can't be reached (several
+  // accounts signed in), a copy is kept in this browser under this person's
+  // email, so people sharing a computer never see each other's details.
+  // An earlier version kept one unlabeled copy here; it can't be tied to a person.
+  try { localStorage.removeItem('heVenueRequester'); } catch (e) {}
+  var LOCAL_KEY = DATA.userKey ? 'heVenueProfiles:' + DATA.userKey : '';
+  var REQUESTER_FIELDS = DATA.form.requesterFields;
+  var store = mergeStores(DATA.profiles, readLocal());
+  var currentId = store.lastUsedId || (store.profiles[0] && store.profiles[0].id) || '';
+  var deleteArmed = false;
+
+  function readLocal() {
+    if (!LOCAL_KEY) return { lastUsedId: '', profiles: [] };
+    try { return JSON.parse(localStorage.getItem(LOCAL_KEY)) || { lastUsedId: '', profiles: [] }; }
+    catch (e) { return { lastUsedId: '', profiles: [] }; }
+  }
+  function mergeStores(a, b) {
+    var byId = {};
+    (a.profiles || []).concat(b.profiles || []).forEach(function (p) {
+      if (!byId[p.id] || (p.updatedAt || 0) > (byId[p.id].updatedAt || 0)) byId[p.id] = p;
+    });
+    var deleted = {};
+    (a.deleted || []).concat(b.deleted || []).forEach(function (id) { deleted[id] = true; });
+    var profiles = Object.keys(byId).map(function (id) { return byId[id]; })
+      .filter(function (p) { return !deleted[p.id]; })
+      .sort(function (x, y) { return x.name.localeCompare(y.name); });
+    var last = (b.lastUsedId && byId[b.lastUsedId] && !deleted[b.lastUsedId]) ? b.lastUsedId : a.lastUsedId;
+    return { lastUsedId: last || '', profiles: profiles, deleted: Object.keys(deleted) };
+  }
+  function persist() {
+    if (LOCAL_KEY) { try { localStorage.setItem(LOCAL_KEY, JSON.stringify(store)); } catch (e) {} }
+    google.script.run.withFailureHandler(function () {}).saveProfiles(store);
+  }
+  function findProfile(id) {
+    return store.profiles.filter(function (p) { return p.id === id; })[0] || null;
+  }
+  function suggestedName(fields) {
+    var person = String(fields.contactPerson || '').split(',')[0].trim();
+    return [String(fields.organization || '').trim(), person].filter(Boolean).join(' – ') || 'Untitled profile';
+  }
+
+  function renderProfiles() {
+    var options = store.profiles.map(function (p) {
+      return '<option value="' + esc(p.id) + '"' + (p.id === currentId ? ' selected' : '') + '>' + esc(p.name) + '</option>';
+    });
+    if (!currentId) options.unshift('<option value="" selected>New profile (not saved yet)</option>');
+    el('profileSelect').innerHTML = options.join('');
+    el('deleteProfile').style.display = currentId ? '' : 'none';
+    el('deleteProfile').textContent = 'Delete';
+    deleteArmed = false;
+    el('profileNote').textContent = store.profiles.length
+      ? 'Profiles are private to your Google account. Generating a link saves changes to the selected profile.'
+      : 'Fill in the requester details once. They\'re saved as a profile when you generate a link.';
+  }
+
+  function fillRequester(profile) {
+    var fields = Object.assign({}, DATA.form.requesterDefaults, profile ? profile.fields : {});
+    ['organization', 'contactPerson', 'localNo', 'contactNumber', 'email', 'approverName'].forEach(function (name) { form.elements[name].value = fields[name] || ''; });
+    var approved = Array.isArray(fields.approvedBy) ? fields.approvedBy : [];
+    Array.prototype.forEach.call(form.querySelectorAll('input[name=approvedBy]'), function (b) { b.checked = approved.indexOf(b.value) !== -1; });
+    form.elements.approvedByOther.value = approved.filter(function (x) { return CH.approvedBy.indexOf(x) === -1; }).join(', ');
+    el('profileName').value = profile ? profile.name : '';
+    var complete = DATA.form.requiredRequesterFields.every(function (name) { return Array.isArray(fields[name]) ? fields[name].length : fields[name]; });
+    el('requesterBox').open = !complete;
+    el('requesterSummary').textContent = complete
+      ? '· ' + fields.organization + ', ' + fields.contactPerson
+      : '· fill in once, saved to this profile';
+  }
+
+  el('profileSelect').addEventListener('change', function () {
+    currentId = this.value;
+    fillRequester(findProfile(currentId));
+    renderProfiles();
+  });
+  el('newProfile').addEventListener('click', function () {
+    currentId = '';
+    fillRequester(null);
+    renderProfiles();
+    el('requesterBox').open = true;
+    form.elements.organization.focus();
+  });
+  el('deleteProfile').addEventListener('click', function () {
+    if (!currentId) return;
+    if (!deleteArmed) {
+      deleteArmed = true;
+      this.textContent = 'Click again to delete';
+      return;
+    }
+    store.profiles = store.profiles.filter(function (p) { return p.id !== currentId; });
+    store.deleted = (store.deleted || []).concat([currentId]);
+    if (store.lastUsedId === currentId) store.lastUsedId = '';
+    persist();
+    currentId = store.profiles[0] ? store.profiles[0].id : '';
+    fillRequester(findProfile(currentId));
+    renderProfiles();
+  });
+
+  // Saves the requester section into the selected profile, or a new one.
+  function saveCurrentProfile(d) {
+    var fields = {};
+    REQUESTER_FIELDS.forEach(function (name) { fields[name] = d[name]; });
+    var name = el('profileName').value.trim() || suggestedName(fields);
+    var profile = findProfile(currentId);
+    if (!profile) {
+      profile = { id: 'p' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6) };
+      store.profiles.push(profile);
+      currentId = profile.id;
+    }
+    profile.name = name;
+    profile.fields = fields;
+    profile.updatedAt = Date.now();
+    store.lastUsedId = currentId;
+    store.profiles.sort(function (x, y) { return x.name.localeCompare(y.name); });
+    persist();
+    renderProfiles();
+  }
+
+  el('venues').innerHTML = DATA.venues.map(function (v) { return '<option value="' + esc(v) + '">'; }).join('');
+  function boxes(name, options, extra) {
+    return options.concat(extra ? [extra] : []).map(function (o) {
+      return '<label><input type="checkbox" name="' + name + '" value="' + esc(o) + '"> ' + esc(F.label(name, o)) +
+        (F.hint(name, o) ? ' <span class="saved">' + esc(F.hint(name, o)) + '</span>' : '') + '</label>';
+    }).join('');
+  }
+  el('equipment').innerHTML = boxes('equipment', CH.equipment, DATA.form.noEquipment);
+  el('conditionsBox').innerHTML = boxes('conditions', CH.conditions);
+  el('approvedByBox').innerHTML = boxes('approvedBy', CH.approvedBy);
+  el('natureSelect').innerHTML = CH.nature.map(function (o) { return '<option>' + esc(o) + '</option>'; }).join('') + '<option value="__other">Other…</option>';
+  var ev = DATA.event;
+  ['venue', 'date', 'startTime', 'endTime', 'participants', 'activityDetails'].forEach(function (name) {
+    if (ev[name] != null && form.elements[name]) form.elements[name].value = ev[name];
+  });
+  form.elements.nature.value = ev.nature || CH.nature[0];
+  Array.prototype.forEach.call(form.querySelectorAll('input[name=conditions]'), function (b) { b.checked = (ev.conditions || []).indexOf(b.value) !== -1; });
+  form.elements.nature.addEventListener('change', function () {
+    form.elements.natureOther.style.display = this.value === '__other' ? '' : 'none';
+    if (this.value === '__other') form.elements.natureOther.focus();
+  });
+  // "None" answers can't be combined with other picks.
+  form.addEventListener('change', function (e) {
+    var t = e.target;
+    if (t.type !== 'checkbox' || !t.checked) return;
+    var none = t.name === 'conditions' ? DATA.form.noneCondition : t.name === 'equipment' ? DATA.form.noEquipment : null;
+    if (!none) return;
+    Array.prototype.forEach.call(form.querySelectorAll('input[name=' + t.name + ']'), function (b) {
+      if (t.value === none ? b !== t : b.value === none) b.checked = false;
+    });
+  });
+  function drawIntake() {
+    var status = F.intakeStatus(), late = F.leadWarning(form.elements.date.value);
+    var st = DATA.formStatus || {};
+    if (st.state === 'closed') status = { text: 'The form is not taking responses' + (st.source === 'report' ? ' (reported by a student)' : '') + ': ' + (st.message || 'closed') };
+    el('intake').textContent = [status.text, late].filter(Boolean).join(' ');
+    el('intake').className = 'note' + (late ? ' late' : '');
+  }
+  form.elements.date.addEventListener('change', drawIntake);
+  drawIntake();
+  fillRequester(findProfile(currentId));
+  renderProfiles();
+
+  function collect() {
+    var data = {};
+    ['organization', 'contactPerson', 'localNo', 'contactNumber', 'email', 'approverName', 'eventTitle', 'activityDetails',
+      'date', 'startTime', 'endTime', 'venue', 'participants', 'proofLink'].forEach(function (name) {
+      data[name] = form.elements[name].value.trim();
+    });
+    data.nature = form.elements.nature.value === '__other' ? form.elements.natureOther.value.trim() : form.elements.nature.value;
+    function checked(name) {
+      return Array.prototype.filter.call(form.querySelectorAll('input[name=' + name + ']'), function (b) { return b.checked; })
+        .map(function (b) { return b.value; });
+    }
+    data.conditions = checked('conditions');
+    data.equipment = checked('equipment');
+    data.approvedBy = checked('approvedBy');
+    var eqOther = form.elements.equipmentOther.value.trim(), apOther = form.elements.approvedByOther.value.trim();
+    if (eqOther) data.equipment = data.equipment.filter(function (x) { return x !== DATA.form.noEquipment; }).concat([eqOther]);
+    if (apOther) data.approvedBy.push(apOther);
+    return data;
+  }
+
+  // --- time helpers (minutes after midnight) ---
+  function toMinutes(hhmm) {
+    var m = /^(\d{1,2}):(\d{2})/.exec(hhmm || '');
+    return m ? Number(m[1]) * 60 + Number(m[2]) : null;
+  }
+  function clock(minutes) {
+    var h = Math.floor(minutes / 60) % 24, m = minutes % 60;
+    return (h % 12 === 0 ? 12 : h % 12) + ':' + (m < 10 ? '0' : '') + m + (h < 12 ? ' AM' : ' PM');
+  }
+  function hhmm(minutes) {
+    var h = Math.floor(minutes / 60), m = minutes % 60;
+    return (h < 10 ? '0' : '') + h + ':' + (m < 10 ? '0' : '') + m;
+  }
+  function longDate(dateText) {
+    var p = dateText.split('-').map(Number);
+    return new Date(p[0], p[1] - 1, p[2]).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+  }
+
+  function freeWindows(bookings) {
+    var open = DATA.hours.openingMinute, close = DATA.hours.closingMinute;
+    var busy = bookings.map(function (b) { return [Math.max(b.start, open), Math.min(b.end, close)]; })
+      .filter(function (p) { return p[1] > p[0]; })
+      .sort(function (a, b) { return a[0] - b[0]; });
+    var windows = [], cursor = open;
+    busy.forEach(function (p) {
+      if (p[0] > cursor) windows.push([cursor, p[0]]);
+      cursor = Math.max(cursor, p[1]);
+    });
+    if (cursor < close) windows.push([cursor, close]);
+    return windows;
+  }
+
+  // --- availability ---
+  function render(state, html) {
+    el('status').className = state;
+    el('status').innerHTML = html;
+    var conflict = state === 'conflict';
+    el('generate').textContent = conflict ? 'Generate link anyway' : 'Generate link';
+    el('generate').className = 'btn ' + (conflict ? 'danger' : 'primary');
+  }
+
+  function evaluate() {
+    var d = collect();
+    if (!d.venue || !d.date || !d.startTime || !d.endTime) {
+      render('incomplete', '<strong>Availability</strong>Pick a venue, date, start and end time.');
+      return;
+    }
+    var start = toMinutes(d.startTime), end = toMinutes(d.endTime);
+    if (end <= start) {
+      render('error', '<strong>Check the times</strong>End time must be later than start time.');
+      return;
+    }
+    if (!venueDay || key(venueDay.venue) !== key(d.venue) || venueDay.date !== d.date) {
+      scheduleLoad();
+      return;
+    }
+    if (!venueDay.known) {
+      render('unknown', '<strong>Not checked</strong>' + esc(d.venue) +
+        ' is not in Venue Registry, so its calendar can\'t be checked. The link will still use what you typed.');
+      return;
+    }
+    var conflicts = venueDay.bookings.filter(function (b) { return b.start < end && b.end > start; });
+    var outside = start < DATA.hours.openingMinute || end > DATA.hours.closingMinute;
+    var when = longDate(d.date) + ', ' + clock(start) + ' to ' + clock(end);
+    var html = conflicts.length
+      ? '<strong>Not available</strong>' + esc(venueDay.venue) + ' is booked during ' + esc(when) + ':<ul>' +
+        conflicts.map(function (b) {
+          var time = b.allDay ? 'all day' : b.startsEarlier ? 'until ' + (b.end >= 1440 ? 'midnight' : clock(b.end)) + ', started the day before'
+            : b.endsLater ? 'from ' + clock(b.start) + ', runs past midnight' : clock(b.start) + ' to ' + clock(b.end);
+          return '<li>' + esc(b.title) + ' (' + time + ')</li>';
+        }).join('') + '</ul>'
+      : '<strong>Available</strong>' + esc(venueDay.venue) + ' has no bookings on ' + esc(when) + '.';
+    if (outside) {
+      html += '<div style="margin-top:6px">This is outside operating hours (' +
+        clock(DATA.hours.openingMinute) + ' to ' + clock(DATA.hours.closingMinute) + ').</div>';
+    }
+    if (conflicts.length || outside) {
+      var windows = freeWindows(venueDay.bookings);
+      html += windows.length
+        ? '<div class="free-list" style="margin-top:6px">Free that day: ' + windows.map(function (w) {
+            return '<button type="button" data-start="' + w[0] + '" data-end="' + w[1] + '">' + clock(w[0]) + ' to ' + clock(w[1]) + '</button>';
+          }).join('') + '</div>'
+        : '<div style="margin-top:6px">No free time that day within operating hours.</div>';
+    }
+    render(conflicts.length ? 'conflict' : 'free', html);
+  }
+
+  // A new venue or date needs that day's bookings from the script.
+  function scheduleLoad() {
+    clearTimeout(loadTimer);
+    render('checking', '<strong>Checking…</strong>Loading the venue calendar.');
+    loadTimer = setTimeout(function () {
+      var d = collect(), seq = ++loadSeq;
+      google.script.run
+        .withSuccessHandler(function (day) { if (seq === loadSeq) { venueDay = day; evaluate(); } })
+        .withFailureHandler(function () {
+          if (seq !== loadSeq) return;
+          render('unknown', '<strong>Couldn\'t check this venue</strong>Google blocked the calendar lookup from this window. ' +
+            'This happens when you\'re signed in to more than one Google account. To check it: close this window, ' +
+            'click the slot in Availability, and open New venue request again. Or use a Chrome profile signed in only to your Ateneo account. ' +
+            'You can still generate the link.');
+        })
+        .getVenueDay(d.venue, d.date);
+    }, 600);
+  }
+
+  el('status').addEventListener('click', function (event) {
+    var start = event.target.getAttribute && event.target.getAttribute('data-start');
+    if (start == null) return;
+    var end = Number(event.target.getAttribute('data-end'));
+    var current = toMinutes(form.elements.startTime.value), currentEnd = toMinutes(form.elements.endTime.value);
+    var length = current != null && currentEnd > current ? currentEnd - current : end - Number(start);
+    form.elements.startTime.value = hhmm(Number(start));
+    form.elements.endTime.value = hhmm(Math.min(end, Number(start) + length));
+    evaluate();
+  });
+
+  ['venue', 'date', 'startTime', 'endTime'].forEach(function (name) {
+    form.elements[name].addEventListener('change', evaluate);
+    form.elements[name].addEventListener('input', evaluate);
+  });
+
+  // --- link ---
+  var LABELS = {
+    organization: 'Organization', contactPerson: 'Point person', localNo: 'Local no.', contactNumber: 'Mobile no.',
+    email: 'Email', approvedBy: 'Approved by', approverName: 'Name of approver', eventTitle: 'Title of event',
+    nature: 'Nature of event', conditions: 'Check all that apply', activityDetails: 'Group activities',
+    date: 'Date', startTime: 'Start time', endTime: 'End time', venue: 'Facility', participants: 'Number of participants',
+    equipment: 'AV equipment', proofLink: 'Proof of approval link'
+  };
+  function buildUrl(d) { return F.url(DATA.formUrl, d); }
+
+  form.addEventListener('submit', function (event) {
+    event.preventDefault();
+    var d = collect();
+    var missing = F.missing(d, DATA.form.requiredRequesterFields.concat(DATA.form.requiredEventFields));
+    if (missing.length) {
+      el('error').textContent = 'Fill in: ' + missing.map(function (f) { return LABELS[f] || f; }).join(', ');
+      el('error').style.display = 'block';
+      if (missing.some(function (f) { return REQUESTER_FIELDS.indexOf(f) !== -1; })) el('requesterBox').open = true;
+      return;
+    }
+    var errs = F.errors(d, DATA.today);
+    var problems = Object.keys(errs);
+    Array.prototype.forEach.call(form.querySelectorAll('[aria-invalid]'), function (input) { input.removeAttribute('aria-invalid'); });
+    if (problems.length) {
+      problems.forEach(function (p) { var i = form.elements[p]; if (i && i.setAttribute) i.setAttribute('aria-invalid', 'true'); });
+      el('error').textContent = problems.map(function (p) { return (LABELS[p] || p) + ': ' + errs[p]; }).join(' ');
+      el('error').style.display = 'block';
+      if (problems.some(function (p) { return REQUESTER_FIELDS.indexOf(p) !== -1; })) el('requesterBox').open = true;
+      var first = form.elements[problems[0]];
+      if (first && first.focus) first.focus();
+      return;
+    }
+    d.contactNumber = String(d.contactNumber).replace(/[\s()-]/g, '').replace(/^\+?63/, '').replace(/^0/, '');
+    el('error').style.display = 'none';
+
+    saveCurrentProfile(d);
+
+    var url = buildUrl(d);
+    var state = el('status').className;
+    el('url').value = url;
+    el('openForm').href = url;
+    el('resultNote').textContent = state === 'free'
+      ? 'The venue is free for this time. Open the form, check the answers, then submit.'
+      : state === 'conflict'
+        ? 'The venue already has a booking at this time. Check before you submit.'
+        : 'Availability wasn\'t confirmed. Open the form, check the answers, then submit.';
+    form.style.display = 'none';
+    el('result').style.display = 'block';
+  });
+
+  el('copy').addEventListener('click', function () {
+    el('url').select();
+    document.execCommand('copy');
+    el('copy').textContent = 'Copied';
+    setTimeout(function () { el('copy').textContent = 'Copy link'; }, 1500);
+  });
+  el('back').addEventListener('click', function () {
+    el('result').style.display = 'none';
+    form.style.display = 'block';
+  });
+
+  evaluate();
+</script>
+</body>
+</html>

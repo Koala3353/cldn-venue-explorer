@@ -1,0 +1,165 @@
+<script>
+/*
+ * Rules for the CFMO request form, shared by the portal and the sheet dialog.
+ * The server has the same checks in checkRequestValues_ (Code.gs).
+ */
+window.RF = (function () {
+  'use strict';
+  var S = {};
+  var DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+  function init(schema) { S = schema || {}; return api; }
+
+  // Short labels for the long 8.a options. The full text is what gets sent.
+  function label(field, option) {
+    var c = (S.choices && S.choices.conditions) || [];
+    if (field === 'conditions') {
+      if (option === c[0]) return 'Food will be served';
+      if (option === c[1]) return 'External guests';
+      if (option === c[2]) return 'Group dynamics or interactive activities';
+      if (option === S.noneCondition) return 'None apply';
+    }
+    return option;
+  }
+  function hint(field, option) {
+    var c = (S.choices && S.choices.conditions) || [];
+    if (field === 'conditions' && option === c[0]) return 'Coordinate with FSQA (fsqa@ateneo.edu).';
+    if (field === 'conditions' && option === c[1]) return 'Coordinate with CSMO (csmo@ateneo.edu).';
+    if (field === 'conditions' && option === c[2]) return 'Describe them in the box below.';
+    return '';
+  }
+
+  function toMinutes(text) { var m = /^(\d{1,2}):(\d{2})/.exec(text || ''); return m ? Number(m[1]) * 60 + Number(m[2]) : null; }
+  function clock(min) {
+    var h = Math.floor(min / 60) % 24, m = min % 60;
+    return (h % 12 === 0 ? 12 : h % 12) + ':' + (m < 10 ? '0' : '') + m + ' ' + (h < 12 ? 'AM' : 'PM');
+  }
+  function isEmpty(v) { return Array.isArray(v) ? !v.length : !String(v == null ? '' : v).trim(); }
+
+  function missing(values, fields) {
+    return fields.filter(function (f) { return isEmpty(values[f]); });
+  }
+
+  /** Returns { field: message } for answers the form would reject or that look wrong. */
+  function errors(values, today) {
+    var e = {}, rules = S.rules || { maxParticipants: 5000 }, choices = S.choices || {};
+    var has = function (f) { return Object.prototype.hasOwnProperty.call(values, f) && !isEmpty(values[f]); };
+    if (has('localNo') && !/^[0-9][0-9 -]{1,14}$/.test(values.localNo)) e.localNo = 'Use numbers only, like 5155. Leave it blank if you have none.';
+    if (has('contactNumber')) {
+      var phone = String(values.contactNumber).replace(/[\s()-]/g, '').replace(/^\+?63/, '').replace(/^0/, '');
+      if (!/^9\d{9}$/.test(phone)) e.contactNumber = 'Use a PH mobile number, like 9171234567 or 0917 123 4567.';
+    }
+    if (has('email')) {
+      var email = String(values.email).toLowerCase();
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) e.email = 'Enter a valid email address.';
+      else if (!/@([a-z0-9-]+\.)*ateneo\.edu$/.test(email)) e.email = 'Use your official Ateneo email (@obf.ateneo.edu for students, @ateneo.edu for employees).';
+    }
+    if (has('contactPerson') && values.contactPerson.indexOf(',') === -1) e.contactPerson = 'Write it as Last Name, First Name.';
+    if (has('approverName') && values.approverName.trim().length < 3) e.approverName = 'Write the approver\'s full name.';
+    if (has('participants')) {
+      var people = Number(values.participants);
+      if (!(people >= 1 && people <= rules.maxParticipants && Math.floor(people) === people)) e.participants = 'Use a whole number from 1 to ' + rules.maxParticipants + '.';
+    }
+    if (has('date')) {
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(values.date)) e.date = 'Pick a valid date.';
+      else if (today && values.date < today) e.date = 'Pick today or a later date.';
+    }
+    var start = toMinutes(values.startTime), end = toMinutes(values.endTime);
+    if (start !== null && end !== null && end <= start) e.endTime = 'The end time must be later than the start time.';
+    var conditions = values.conditions || [];
+    if (conditions.length > 1 && conditions.indexOf(S.noneCondition) !== -1) e.conditions = '"None apply" can\'t be picked with the other options.';
+    if (choices.conditions && conditions.indexOf(choices.conditions[2]) !== -1 && /^(n\/?a|none|)$/i.test(String(values.activityDetails || '').trim())) {
+      e.activityDetails = 'Describe the group dynamics or interactive activities.';
+    }
+    var equipment = values.equipment || [];
+    if (equipment.length > 1 && equipment.indexOf(S.noEquipment) !== -1) e.equipment = '"None" can\'t be picked with other equipment.';
+    if (has('proofLink') && !/^https:\/\/\S+\.\S+/.test(values.proofLink)) e.proofLink = 'Paste the full share link, starting with https://';
+    return e;
+  }
+
+  /** The prefilled link. Needs entry IDs, so only the sheet dialog builds it in the browser. */
+  function url(formUrl, values) {
+    var entries = S.entries, choices = S.choices, params = [];
+    function add(field, value) { if (value) params.push('entry.' + entries[field] + '=' + encodeURIComponent(value)); }
+    function addOther(field, value) {
+      params.push('entry.' + entries[field] + '=__other_option__', 'entry.' + entries[field] + '.other_option_response=' + encodeURIComponent(value));
+    }
+    ['organization', 'contactPerson', 'localNo', 'contactNumber', 'email', 'eventTitle', 'activityDetails',
+      'venue', 'participants', 'approverName', 'proofLink'].forEach(function (f) { add(f, values[f]); });
+    if (values.nature) {
+      if (choices.nature.indexOf(values.nature) !== -1) add('nature', values.nature);
+      else addOther('nature', values.nature);
+    }
+    S.listFields.forEach(function (f) {
+      var items = values[f] || [];
+      items.filter(function (x) { return choices[f].indexOf(x) !== -1; }).forEach(function (x) { add(f, x); });
+      var other = items.filter(function (x) { return choices[f].indexOf(x) === -1; });
+      if (other.length && S.otherAllowed.indexOf(f) !== -1) addOther(f, other.join(', '));
+    });
+    var start = toMinutes(values.startTime), end = toMinutes(values.endTime);
+    if (start !== null) add('startTime', clock(start));
+    if (end !== null) add('endTime', clock(end));
+    if (/^\d{4}-\d{2}-\d{2}$/.test(values.date || '')) {
+      var d = values.date.split('-').map(Number);
+      params.push('entry.' + entries.date + '_year=' + d[0], 'entry.' + entries.date + '_month=' + d[1], 'entry.' + entries.date + '_day=' + d[2]);
+    }
+    return formUrl + '?usp=pp_url&' + params.join('&');
+  }
+
+  // ---------- when the form takes requests (Philippine time) ----------
+  function manilaNow() {
+    var parts = {};
+    try {
+      new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Manila', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23', weekday: 'short' })
+        .formatToParts(new Date()).forEach(function (p) { parts[p.type] = p.value; });
+    } catch (err) {
+      var d = new Date();
+      parts = { year: d.getFullYear(), month: String(d.getMonth() + 1).padStart(2, '0'), day: String(d.getDate()).padStart(2, '0'), hour: d.getHours(), minute: d.getMinutes() };
+    }
+    var iso = parts.year + '-' + parts.month + '-' + parts.day;
+    var p = iso.split('-').map(Number);
+    return { iso: iso, minute: Number(parts.hour) * 60 + Number(parts.minute), dow: new Date(p[0], p[1] - 1, p[2]).getDay() };
+  }
+  function windowsFor(dow) {
+    var intake = S.intake || {};
+    if (dow === 0) return [];
+    return dow === 6 ? intake.saturday || [] : intake.weekday || [];
+  }
+  /** { open, text } for right now. */
+  function intakeStatus() {
+    var now = manilaNow();
+    var current = windowsFor(now.dow).filter(function (w) { return now.minute >= w[0] && now.minute < w[1]; })[0];
+    var cap = (S.intake && S.intake.dailyCap) || 60;
+    if (current) return { open: true, text: 'The form is taking requests now, until ' + clock(current[1]) + '. Only the first ' + cap + ' a day are accepted.' };
+    for (var offset = 0; offset < 8; offset++) {
+      var dow = (now.dow + offset) % 7;
+      var next = windowsFor(dow).filter(function (w) { return offset > 0 || w[0] > now.minute; })[0];
+      if (next) {
+        var when = offset === 0 ? 'today' : offset === 1 ? 'tomorrow' : DAY_NAMES[dow];
+        return { open: false, text: 'The form is closed right now. It opens ' + when + ' at ' + clock(next[0]) + '. Hours: Mon to Fri 9 to 11 AM and 2 to 4 PM, Sat 9 to 11 AM.' };
+      }
+    }
+    return { open: false, text: '' };
+  }
+  /** Working days (Mon to Fri) after today, up to and including the event date. */
+  function workingDaysUntil(todayIso, dateIso) {
+    if (!dateIso || dateIso <= todayIso) return 0;
+    var a = todayIso.split('-').map(Number), b = dateIso.split('-').map(Number);
+    var d = new Date(a[0], a[1] - 1, a[2]), end = new Date(b[0], b[1] - 1, b[2]), count = 0;
+    while (d < end && count < 30) { d.setDate(d.getDate() + 1); if (d.getDay() !== 0 && d.getDay() !== 6) count++; }
+    return count;
+  }
+  function leadWarning(dateIso) {
+    var need = (S.intake && S.intake.leadWorkingDays) || 3;
+    var today = manilaNow().iso;
+    if (!dateIso || dateIso < today) return '';
+    var days = workingDaysUntil(today, dateIso);
+    return days < need ? 'CFMO needs requests ' + need + ' working days before the event. Sent today, this one is late (' +
+      (days === 0 ? 'same day' : days + ' working day' + (days === 1 ? '' : 's')) + ' ahead) and may be turned down.' : '';
+  }
+
+  var api = { init: init, label: label, hint: hint, errors: errors, missing: missing, url: url, clock: clock, toMinutes: toMinutes,
+    intakeStatus: intakeStatus, leadWarning: leadWarning, workingDaysUntil: workingDaysUntil, manilaNow: manilaNow };
+  return api;
+})();
+</script>

@@ -1,0 +1,638 @@
+<style>
+  /* Agi: the HE Venue Explorer eaglet. Decorative; every message Agi says is also shown or announced elsewhere. */
+  .agi-wrap { position: fixed; left: 0; top: 0; z-index: var(--z-agi); width: 92px; height: 92px; pointer-events: none;
+    transform: translate3d(var(--agi-x, -200px), var(--agi-y, -200px), 0); will-change: transform; }
+  .agi-wrap.walking { transition: transform var(--walk-ms, 2000ms) linear; }
+  .agi-wrap.settle { transition: transform 420ms var(--ease); }
+  .agi-hold { position: relative; width: 100%; height: 100%; pointer-events: auto; touch-action: none; }
+  .agi-btn { width: 100%; height: 100%; padding: 0; border: 0; background: none; cursor: grab; -webkit-tap-highlight-color: transparent; touch-action: none; user-select: none; -webkit-user-select: none; }
+  .agi-wrap.dragging .agi-btn { cursor: grabbing; }
+  .agi-btn:focus-visible { outline: 3px solid var(--cobalt); outline-offset: 2px; border-radius: 50%; }
+  .agi-svg { width: 100%; height: 100%; overflow: visible; }
+  .agi-fill { fill: var(--agi-body, #4cc3ff); transition: fill 380ms ease; }
+  .agi-wing { fill: var(--agi-wing, #2f9fd6); transition: fill 380ms ease; }
+  .agi-stroke { stroke: #17171c; stroke-width: 3.5; stroke-linejoin: round; stroke-linecap: round; }
+  .agi-bob { transform-box: view-box; transform-origin: 60px 108px; }
+  .agi-eyes { transition: transform 160ms ease-out; }
+
+  .agi-face { display: none; }
+  .agi-svg[data-face="normal"] .face-normal, .agi-svg[data-face="happy"] .face-happy, .agi-svg[data-face="sad"] .face-sad,
+  .agi-svg[data-face="x"] .face-x, .agi-svg[data-face="wow"] .face-wow, .agi-svg[data-face="sleepy"] .face-sleepy,
+  .agi-svg[data-face="yawn"] .face-sleepy, .agi-svg[data-face="wink"] .face-wink, .agi-svg[data-face="love"] .face-love,
+  .agi-svg[data-face="dizzy"] .face-dizzy, .agi-svg[data-face="squint"] .face-squint { display: inline; }
+  .beak-open { display: none; }
+  .agi-svg[data-face="wow"] .beak-closed, .agi-svg[data-face="happy"] .beak-closed, .agi-svg[data-face="yawn"] .beak-closed,
+  .agi-svg[data-face="love"] .beak-closed, .agi-svg[data-face="dizzy"] .beak-closed { display: none; }
+  .agi-svg[data-face="wow"] .beak-open, .agi-svg[data-face="happy"] .beak-open, .agi-svg[data-face="yawn"] .beak-open,
+  .agi-svg[data-face="love"] .beak-open, .agi-svg[data-face="dizzy"] .beak-open { display: inline; }
+  .agi-svg[data-face="yawn"] .beak-open { transform-box: fill-box; transform-origin: top center; animation: yawnBeak 1.4s ease-in-out; }
+  @keyframes yawnBeak { 40%, 70% { transform: scale(1.25, 1.6); } }
+  .face-normal .lid { transform-box: fill-box; transform-origin: center; transition: transform 90ms ease-in; }
+  .agi-svg.blink .face-normal .lid { transform: scaleY(0.08); }
+  .face-dizzy path { transform-box: fill-box; transform-origin: center; animation: dizzyEye 700ms linear infinite; }
+  @keyframes dizzyEye { to { transform: rotate(360deg); } }
+
+  .agi-extra { opacity: 0; transition: opacity 200ms ease; }
+  .agi-svg.show-sparkles .sparkles, .agi-svg.show-sweat .sweat, .agi-svg.show-zzz .zzz, .agi-svg.show-hearts .hearts,
+  .agi-svg.show-notes .notes, .agi-svg.show-stars .stars, .agi-svg.show-puff .puff { opacity: 1; }
+  .sparkles path, .hearts path, .notes g, .stars path, .puff circle { transform-box: fill-box; transform-origin: center; }
+  .agi-svg.show-sparkles .sparkles path { animation: twinkle 700ms var(--pop) both; }
+  .agi-svg.show-sparkles .sparkles path:nth-child(2) { animation-delay: 80ms; }
+  .agi-svg.show-sparkles .sparkles path:nth-child(3) { animation-delay: 160ms; }
+  .agi-svg.show-hearts .hearts path { animation: floatUp 1.5s var(--ease) both; }
+  .agi-svg.show-hearts .hearts path:nth-child(2) { animation-delay: 220ms; }
+  .agi-svg.show-hearts .hearts path:nth-child(3) { animation-delay: 440ms; }
+  .agi-svg.show-notes .notes g { animation: floatUp 1.2s ease-out infinite; }
+  .agi-svg.show-notes .notes g:nth-child(2) { animation-delay: 600ms; }
+  .agi-svg.show-stars .stars { transform-box: view-box; transform-origin: 60px 22px; animation: orbit 900ms linear infinite; }
+  .agi-svg.show-puff .puff circle { animation: puff 700ms ease-out both; }
+  .agi-svg.show-puff .puff circle:nth-child(2) { animation-delay: 60ms; }
+  .agi-svg.show-zzz .zzz path { animation: zfloat 2.4s ease-in-out infinite; }
+  .agi-svg.show-zzz .zzz path:nth-child(2) { animation-delay: 1.2s; }
+  @keyframes twinkle { from { transform: scale(0) rotate(-40deg); } to { transform: scale(1) rotate(0); } }
+  @keyframes floatUp { 0% { transform: translateY(8px) scale(0.4); opacity: 0; } 25% { opacity: 1; } 100% { transform: translateY(-22px) scale(1); opacity: 0; } }
+  @keyframes orbit { to { transform: rotate(360deg); } }
+  @keyframes puff { 0% { transform: scale(0.3); opacity: 0.9; } 100% { transform: scale(1.6) translateX(-6px); opacity: 0; } }
+  @keyframes zfloat { 0% { transform: translate(0, 6px); opacity: 0; } 30% { opacity: 1; } 100% { transform: translate(6px, -12px); opacity: 0; } }
+
+  .agi-wing-l { transform-box: fill-box; transform-origin: 90% 20%; }
+  .agi-wing-r { transform-box: fill-box; transform-origin: 10% 20%; }
+  .agi-leg { transform-box: fill-box; transform-origin: top center; }
+
+  /* One-shot motions. */
+  .agi-bob.a-pop { animation: aPop 520ms var(--pop); }
+  .agi-bob.a-hop { animation: aHop 420ms var(--ease); }
+  .agi-bob.a-squish { animation: aSquish 260ms var(--ease); }
+  .agi-bob.a-shake { animation: aShake 480ms ease-in-out; }
+  .agi-bob.a-jump { animation: aJump 620ms var(--pop); }
+  .agi-bob.a-spin { animation: aSpin 760ms var(--ease); }
+  .agi-bob.a-twirl { animation: aTwirl 1.3s ease-in-out; }
+  .agi-bob.a-slump { animation: aSlump 900ms var(--ease); }
+  .agi-bob.a-tilt { animation: aTilt 700ms var(--ease); }
+  .agi-bob.a-nod { animation: aNod 360ms var(--ease); }
+  .agi-bob.a-gasp { animation: aGasp 420ms var(--pop); }
+  .agi-bob.a-breathe { animation: aBreathe 2.6s ease-in-out; }
+  .agi-bob.a-stretch { animation: aStretch 1.2s var(--ease); }
+  .agi-bob.a-dance { animation: aDance 1.6s ease-in-out; }
+  .agi-bob.a-trip { animation: aTrip 1.6s var(--ease); }
+  .agi-bob.a-peek { animation: aPeek 1.7s var(--ease); }
+  .agi-bob.a-hiccup { animation: aHiccup 1.3s ease-out; }
+  .agi-bob.a-sneeze { animation: aSneeze 900ms ease-out; }
+  .agi-bob.a-shiver { animation: aShiver 700ms linear; }
+  .agi-bob.a-wiggle { animation: aWiggle 600ms ease-in-out; }
+  .agi-bob.a-wave .agi-wing-r, .agi-bob.a-wave .agi-wing-l { animation: aWave 260ms ease-in-out 3 alternate; }
+  .agi-bob.a-flap .agi-wing-r, .agi-bob.a-flap .agi-wing-l, .agi-bob.a-dance .agi-wing-r, .agi-bob.a-dance .agi-wing-l { animation: aWave 140ms ease-in-out 8 alternate; }
+  .agi-bob.a-flap { animation: aFlap 1.1s ease-in-out; }
+  @keyframes aPop { 0% { transform: translateY(30px) scale(0.6); opacity: 0; } 60% { transform: translateY(-6px) scale(1.06); opacity: 1; } 100% { transform: none; } }
+  @keyframes aHop { 40% { transform: translateY(-12px); } 100% { transform: none; } }
+  @keyframes aSquish { 40% { transform: scale(1.1, 0.86); } 100% { transform: none; } }
+  @keyframes aShake { 15%, 55% { transform: translateX(-6px) rotate(-4deg); } 35%, 75% { transform: translateX(6px) rotate(4deg); } 100% { transform: none; } }
+  @keyframes aJump { 30% { transform: translateY(-26px) scale(0.96, 1.06); } 60% { transform: translateY(0) scale(1.08, 0.92); } 100% { transform: none; } }
+  @keyframes aSpin { 40% { transform: translateY(-18px) rotate(200deg); } 80% { transform: translateY(0) rotate(360deg); } 100% { transform: rotate(360deg); } }
+  @keyframes aTwirl { 0% { transform: none; } 45% { transform: rotate(540deg) scale(0.92); } 75% { transform: rotate(700deg) translateX(-3px); } 88% { transform: rotate(735deg) translateX(3px); } 100% { transform: rotate(720deg); } }
+  @keyframes aSlump { 25%, 70% { transform: translateY(5px) scale(1.04, 0.92); } 100% { transform: none; } }
+  @keyframes aTilt { 30%, 65% { transform: rotate(-12deg); } 100% { transform: none; } }
+  @keyframes aNod { 45% { transform: rotate(6deg) translateY(2px); } 100% { transform: none; } }
+  @keyframes aGasp { 35% { transform: scale(1.12); } 100% { transform: none; } }
+  @keyframes aWave { to { transform: rotate(-28deg); } }
+  @keyframes aBreathe { 50% { transform: scale(1.025, 0.985); } }
+  @keyframes aStretch { 30% { transform: scale(0.92, 1.14); } 55% { transform: scale(0.94, 1.12) rotate(-3deg); } 75% { transform: scale(1.06, 0.94); } 100% { transform: none; } }
+  @keyframes aDance { 0%, 100% { transform: none; } 12% { transform: translateX(-5px) rotate(-8deg); } 25% { transform: translateY(-8px); } 37% { transform: translateX(5px) rotate(8deg); }
+    50% { transform: translateY(-8px); } 62% { transform: translateX(-5px) rotate(-8deg); } 75% { transform: translateY(-8px) rotate(4deg); } 87% { transform: translateX(5px) rotate(8deg); } }
+  @keyframes aTrip { 0% { transform: none; } 12% { transform: translateX(4px) rotate(10deg); } 28% { transform: translateX(6px) rotate(88deg) translateY(4px); } 62% { transform: translateX(6px) rotate(88deg) translateY(4px); }
+    80% { transform: translateY(-10px) rotate(-6deg); } 100% { transform: none; } }
+  @keyframes aPeek { 0% { transform: none; } 22%, 62% { transform: translateY(70px); } 75% { transform: translateY(46px); } 85% { transform: translateY(52px); } 100% { transform: none; } }
+  @keyframes aHiccup { 0%, 20%, 45%, 70%, 100% { transform: none; } 10%, 35%, 60% { transform: translateY(-9px) scale(1.04, 0.96); } }
+  @keyframes aSneeze { 0% { transform: none; } 45% { transform: rotate(-10deg) scale(1.06, 0.96); } 55% { transform: rotate(9deg) translateX(-6px) scale(0.96, 1.04); } 100% { transform: none; } }
+  @keyframes aShiver { 0%, 100% { transform: none; } 10%, 30%, 50%, 70%, 90% { transform: translateX(-2px); } 20%, 40%, 60%, 80% { transform: translateX(2px); } }
+  @keyframes aWiggle { 25% { transform: rotate(-7deg); } 75% { transform: rotate(7deg); } 100% { transform: none; } }
+  @keyframes aFlap { 35%, 60% { transform: translateY(-14px); } 100% { transform: none; } }
+
+  /* States that loop. */
+  .agi-svg.walking .agi-bob { animation: waddle 300ms ease-in-out infinite alternate; }
+  .agi-svg.walking .leg-l { animation: step 300ms ease-in-out infinite alternate; }
+  .agi-svg.walking .leg-r { animation: step 300ms ease-in-out infinite alternate-reverse; }
+  .agi-svg.sleeping .agi-bob { animation: snore 3.2s ease-in-out infinite; }
+  .agi-svg.dragging .agi-bob { animation: dangle 360ms ease-in-out infinite alternate; transform-origin: 60px 14px; }
+  .agi-svg.dragging .agi-wing-l, .agi-svg.dragging .agi-wing-r { animation: aWave 110ms ease-in-out infinite alternate; }
+  .agi-svg.dragging .agi-leg { animation: step 160ms ease-in-out infinite alternate; }
+  @keyframes waddle { from { transform: rotate(-5deg) translateY(-1px); } to { transform: rotate(5deg) translateY(1px); } }
+  @keyframes step { from { transform: translateY(0); } to { transform: translateY(-4px); } }
+  @keyframes snore { 0%, 100% { transform: translateY(3px) scale(1.02, 0.95); } 50% { transform: translateY(3px) scale(1.06, 0.92); } }
+  @keyframes dangle { from { transform: rotate(-10deg); } to { transform: rotate(10deg); } }
+
+  .agi-bubble { pointer-events: none; position: absolute; bottom: 64px; right: calc(100% + 6px); width: max-content; max-width: 230px; padding: 10px 13px;
+    border: 2px solid var(--edge); border-radius: 14px 14px 4px 14px; background: var(--card); color: var(--ink); font: 600 13.5px/1.35 var(--body);
+    box-shadow: 3px 3px 0 var(--shadow-c); opacity: 0; transform: translateY(6px) scale(0.96); transform-origin: bottom right;
+    transition: opacity 180ms ease, transform 220ms var(--ease); }
+  .agi-wrap.flip .agi-bubble { right: auto; left: calc(100% + 6px); border-radius: 14px 14px 14px 4px; transform-origin: bottom left; }
+  .agi-bubble.on { opacity: 1; transform: none; }
+  .agi-close { pointer-events: auto; position: absolute; right: -2px; top: -6px; width: 24px; height: 24px; border-radius: 50%; border: 2px solid var(--edge);
+    background: var(--card); color: var(--ink); font: 700 12px/1 var(--body); cursor: pointer; display: grid; place-items: center; opacity: 0; transition: opacity 150ms ease; }
+  .agi-wrap.flip .agi-close { right: auto; left: -2px; }
+  .agi-hold:hover .agi-close, .agi-close:focus-visible { opacity: 1; }
+  .agi-wrap.dragging .agi-close { opacity: 0 !important; }
+  @media (hover: none) { .agi-close { opacity: 0.85; } }
+
+  @media (max-width: 720px) {
+    .agi-wrap { width: 62px; height: 62px; }
+    .agi-bubble { max-width: min(200px, calc(100vw - 100px)); bottom: 44px; font-size: 13px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .agi-bob, .agi-svg .agi-bob, .agi-leg, .agi-wing-l, .agi-wing-r, .agi-extra *, .agi-extra { animation: none !important; }
+    .agi-wrap.walking, .agi-wrap.settle, .agi-eyes { transition: none; }
+  }
+</style>
+
+<script>
+window.Agi = (function () {
+  'use strict';
+  var root = document.getElementById('agiRoot');
+  var STORE = 'heAgiHidden', SPOT = 'heAgiSpot';
+  var reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var finePointer = window.matchMedia('(hover: hover) and (pointer: fine)').matches;
+  if (!root) return { react: function () {}, setColor: function () {} };
+
+  // Colours per event type. Wings are a darker shade of the body.
+  var COLORS = {
+    sky: ['#4cc3ff', '#2f9fd6'], cobalt: ['#7c93ff', '#4d66e8'], teal: ['#36d1c4', '#1fa89c'], mint: ['#2fd18a', '#1ea86c'],
+    lemon: ['#ffd60a', '#e0b400'], tangerine: ['#ff9f1c', '#e07f00'], coral: ['#ff5d4f', '#d83e31'], pink: ['#ff8fb8', '#e66b97'],
+    sand: ['#f4c06f', '#d69f48'], night: ['#5b5f97', '#3f437a'], lilac: ['#b8a1ff', '#9177f0'], grape: ['#c56bff', '#9b45d6'],
+  };
+  var ROUTE_COLORS = { '': 'sky', find: 'cobalt', schedule: 'tangerine', venues: 'mint', book: 'pink', access: 'lemon' };
+
+  // type: [colour, face, motion, extra, priority, lines]
+  var REACTIONS = {
+    hello:    ['sky', 'happy', 'pop', null, 4, null],
+    nav:      [null, 'normal', 'hop', null, 2, null],
+    click:    [null, 'normal', 'squish', null, 1, null],
+    change:   ['pink', 'normal', 'nod', null, 1, null],
+    loading:  ['teal', 'squint', 'breathe', null, 3, ['Reading the calendars…', 'Knocking on every room…', 'Hang on, flipping pages…']],
+    success:  ['mint', 'happy', 'jump', 'sparkles', 4, null],
+    empty:    ['sand', 'sad', 'tilt', null, 4, ['Nothing free there. Try another day?', 'All booked. Another building, maybe?']],
+    error:    ['coral', 'x', 'shake', 'sweat', 5, ['That didn\'t work. Try the reload button.', 'Google said no. One more try?']],
+    invalid:  ['tangerine', 'wow', 'wiggle', null, 4, ['Something in the form needs a fix.']],
+    limit:    ['tangerine', 'sad', 'slump', 'sweat', 5, null],
+    pro:      ['lemon', 'love', 'twirl', 'sparkles', 5, ['Pro unlocked! Autofill is yours.']],
+    locked:   ['lemon', 'wow', 'gasp', null, 3, ['That one is a Pro feature.']],
+    copy:     ['mint', 'wink', 'hop', null, 4, ['Copied!']],
+    link:     ['cobalt', 'happy', 'jump', 'sparkles', 4, ['Your form is ready. Check it, then submit.']],
+    conflict: ['coral', 'wow', 'gasp', null, 4, ['That time is taken. Pick a free window?']],
+    free:     ['mint', 'happy', 'nod', null, 4, ['That room is free then!']],
+    dark:     ['night', 'sleepy', 'slump', 'zzz', 4, ['Lights off. Much better.']],
+    light:    ['sky', 'wow', 'hop', null, 4, ['Ack, bright! Okay, lights on.']],
+    sent:     ['pink', 'happy', 'flap', null, 4, ['Request sent. Watch your inbox.']],
+    poke:     [null, 'wink', 'squish', null, 4, null],
+    pet:      ['pink', 'love', 'wiggle', 'hearts', 4, ['Hehe, that tickles.', 'More scritches please.', 'Best day ever.', 'Prrr… wait, birds don\'t purr.']],
+    dizzy:    ['grape', 'dizzy', 'twirl', 'stars', 5, ['Whoa. Too many clicks. The room is spinning.', 'Okay okay, I\'m awake! Stop!']],
+    grab:     ['lilac', 'wow', null, null, 5, ['Wheee!', 'Hey, put me down!', 'I can fly! Sort of.']],
+    drop:     [null, 'happy', 'squish', 'puff', 4, null],
+    bye:      ['sky', 'wink', 'wave', null, 5, ['See you! Pick the account you want.', 'Bye for now. Come back soon!']],
+    wake:     ['sky', 'wow', 'jump', null, 5, ['Huh? I\'m up! I wasn\'t sleeping.', 'Five more minutes…', 'Oh! Hi. I was resting my eyes.']],
+  };
+  // Things Agi does on its own when nobody is busy. [weight, run]
+  var ANTICS = [
+    [5, function () { walk(); }],
+    [2, function () { lookAround(); }],
+    [2, function () { act('sleepy', 'stretch', null, null, maybe(['*streeetch*', 'Ahh, that\'s better.'])); }],
+    [2, function () { act('yawn', 'breathe', null, null, maybe(['*yaaawn*', 'So many calendars…'])); }],
+    [1.5, function () { act('happy', 'dance', 'notes', null, maybe(['Free rooms, free rooms, la la la', 'Dance break!'])); }],
+    [1.2, function () { act('normal', 'flap', null); }],
+    [1, function () { act('wow', 'hiccup', null, null, maybe(['*hic*'])); }],
+    [1, function () { act('wink', 'spin', 'sparkles'); }],
+    [0.6, function () { act('x', 'trip', 'puff', 'sand', maybe(['Ow. Meant to do that.', 'Nobody saw that.'])); }],
+    [0.8, function () { act('squint', 'sneeze', 'puff', null, maybe(['Achoo! Dusty calendars.'])); }],
+    [0.8, function () { act('normal', 'peek', null, null, null, 1700); }],
+    [0.8, function () { act('normal', 'shiver', null, 'teal', maybe(['Brr, the aircon in here.'])); }],
+  ];
+  var TIPS = [
+    'Click a time in the results to start a booking.',
+    'Schedules show the free gaps between bookings in blue.',
+    'Need a room at an exact time? Open "More options" on Find.',
+    'The venue list syncs with the CFMO site every day.',
+    'You can drag me anywhere. Rub me for scritches.',
+    'I check the room\'s calendar again right before you book.',
+    'Dark mode lives in the top right.',
+  ];
+
+  root.innerHTML =
+    '<div class="agi-wrap">' +
+      '<div class="agi-bubble" aria-hidden="true"></div>' +
+      '<div class="agi-hold">' +
+        '<button class="agi-btn" type="button" aria-label="Agi, the helper. Click for a tip. Drag to move.">' + svg() + '</button>' +
+        '<button class="agi-close" type="button" aria-label="Hide Agi">×</button>' +
+      '</div>' +
+    '</div>';
+
+  var wrap = root.firstChild;
+  var btn = root.querySelector('.agi-btn');
+  var art = root.querySelector('.agi-svg');
+  var bob = root.querySelector('.agi-bob');
+  var eyes = root.querySelector('.agi-eyes');
+  var bubble = root.querySelector('.agi-bubble');
+  var returnBtn = document.getElementById('agiReturn');
+  var faceTimer, bubbleTimer, extraTimer, idleTimer, blinkTimer, anticTimer, walkTimer, eyeTimer;
+  var lastPriority = 0, lastAt = 0, lastUserAt = Date.now();
+  var colorName = 'sky';
+  var asleep = false, walking = false, dragging = false;
+  var pos = { fx: 1, lift: 0 };  // fx: 0 = far left, 1 = far right. lift: px above the resting line.
+  try { var saved = JSON.parse(localStorage.getItem(SPOT) || 'null'); if (saved && saved.fx >= 0 && saved.fx <= 1) pos = { fx: saved.fx, lift: Math.max(0, saved.lift || 0) }; } catch (e) {}
+
+  function svg() {
+    return '<svg class="agi-svg" viewBox="0 0 120 120" data-face="normal" role="img" aria-label="Agi the eaglet">' +
+      '<ellipse cx="60" cy="113" rx="27" ry="4.5" fill="#17171c" opacity="0.14"/>' +
+      '<g class="agi-bob">' +
+        '<path class="agi-stroke agi-leg leg-l" d="M50 104v6M44 111h12" fill="none" stroke="#ff9f1c"/>' +
+        '<path class="agi-stroke agi-leg leg-r" d="M70 104v6M64 111h12" fill="none" stroke="#ff9f1c"/>' +
+        '<path class="agi-wing agi-wing-l agi-stroke" d="M27 62c-13 3-17 16-11 26 7-1 13-6 16-13z"/>' +
+        '<path class="agi-wing agi-wing-r agi-stroke" d="M93 62c13 3 17 16 11 26-7-1-13-6-16-13z"/>' +
+        '<path class="agi-fill agi-stroke" d="M56 21c-3-8 1-14 7-15-1 4 0 7 3 9 2-4 6-6 10-5-4 3-5 7-4 12z"/>' +
+        '<path class="agi-fill agi-stroke" d="M60 18c26 0 38 21 38 47 0 26-16 41-38 41S22 91 22 65c0-26 12-47 38-47z"/>' +
+        '<ellipse cx="60" cy="82" rx="23" ry="19" fill="#ffffff" opacity="0.6"/>' +
+        '<ellipse cx="37" cy="71" rx="6" ry="3.6" fill="#ff8fb8" opacity="0.75"/>' +
+        '<ellipse cx="83" cy="71" rx="6" ry="3.6" fill="#ff8fb8" opacity="0.75"/>' +
+        '<g class="agi-eyes">' +
+          '<g class="agi-face face-normal">' +
+            '<g class="lid"><ellipse cx="47" cy="57" rx="5.5" ry="7" fill="#17171c"/><circle cx="49" cy="54.5" r="2" fill="#fff"/></g>' +
+            '<g class="lid"><ellipse cx="73" cy="57" rx="5.5" ry="7" fill="#17171c"/><circle cx="75" cy="54.5" r="2" fill="#fff"/></g>' +
+          '</g>' +
+          '<g class="agi-face face-happy agi-stroke" fill="none"><path d="M41 59c3-7 9-7 12 0"/><path d="M67 59c3-7 9-7 12 0"/></g>' +
+          '<g class="agi-face face-sad agi-stroke" fill="none"><path d="M41 55c3 5 9 5 12 0"/><path d="M67 55c3 5 9 5 12 0"/><path d="M41 47l11 3M79 47l-11 3"/></g>' +
+          '<g class="agi-face face-x agi-stroke" fill="none"><path d="M42 52l10 10M52 52L42 62"/><path d="M68 52l10 10M78 52L68 62"/></g>' +
+          '<g class="agi-face face-wow"><circle cx="47" cy="57" r="7.5" fill="#fff" class="agi-stroke"/><circle cx="47" cy="57" r="3.4" fill="#17171c"/>' +
+            '<circle cx="73" cy="57" r="7.5" fill="#fff" class="agi-stroke"/><circle cx="73" cy="57" r="3.4" fill="#17171c"/></g>' +
+          '<g class="agi-face face-sleepy agi-stroke" fill="none"><path d="M41 58c4 3 8 3 12 0"/><path d="M67 58c4 3 8 3 12 0"/></g>' +
+          '<g class="agi-face face-squint agi-stroke" fill="none"><path d="M41 57h12"/><path d="M67 57h12"/></g>' +
+          '<g class="agi-face face-wink"><ellipse cx="47" cy="57" rx="5.5" ry="7" fill="#17171c"/><circle cx="49" cy="54.5" r="2" fill="#fff"/>' +
+            '<path class="agi-stroke" d="M67 58c3-6 9-6 12 0" fill="none"/></g>' +
+          '<g class="agi-face face-love" fill="#ff3d6e"><path class="agi-stroke" d="M47 63l-6.5-6.5a4 4 0 0 1 6.5-4.5 4 4 0 0 1 6.5 4.5z"/>' +
+            '<path class="agi-stroke" d="M73 63l-6.5-6.5a4 4 0 0 1 6.5-4.5 4 4 0 0 1 6.5 4.5z"/></g>' +
+          '<g class="agi-face face-dizzy agi-stroke" fill="none"><path d="M47 57m-1 0a1 1 0 1 1 2 0a3 3 0 1 1-6 0a5 5 0 1 1 10 0"/>' +
+            '<path d="M73 57m-1 0a1 1 0 1 1 2 0a3 3 0 1 1-6 0a5 5 0 1 1 10 0"/></g>' +
+        '</g>' +
+        '<path class="beak-closed agi-stroke" d="M54 65l6 7 6-7z" fill="#ff9f1c"/>' +
+        '<g class="beak-open"><path class="agi-stroke" d="M53 64h14l-7 11z" fill="#ff9f1c"/><path d="M56.5 67h7l-3.5 5z" fill="#c2410c"/></g>' +
+        '<g class="agi-extra sparkles" fill="#ffd60a">' +
+          '<path class="agi-stroke" d="M15 30l3 7 7 3-7 3-3 7-3-7-7-3 7-3z"/>' +
+          '<path class="agi-stroke" d="M104 22l2 5 5 2-5 2-2 5-2-5-5-2 5-2z"/>' +
+          '<path class="agi-stroke" d="M106 92l2 4 4 2-4 2-2 4-2-4-4-2 4-2z"/>' +
+        '</g>' +
+        '<g class="agi-extra hearts" fill="#ff3d6e">' +
+          '<path class="agi-stroke" d="M98 34l-6-6a3.6 3.6 0 0 1 6-4 3.6 3.6 0 0 1 6 4z" stroke-width="2.5"/>' +
+          '<path class="agi-stroke" d="M20 40l-5-5a3 3 0 0 1 5-3.4 3 3 0 0 1 5 3.4z" stroke-width="2.5"/>' +
+          '<path class="agi-stroke" d="M86 16l-4-4a2.6 2.6 0 0 1 4-2.8 2.6 2.6 0 0 1 4 2.8z" stroke-width="2.5"/>' +
+        '</g>' +
+        '<g class="agi-extra notes" fill="#17171c">' +
+          '<g><path d="M100 30v-12l8-2v12" fill="none" stroke="#17171c" stroke-width="2.5"/><circle cx="98" cy="30" r="3"/><circle cx="106" cy="28" r="3"/></g>' +
+          '<g><path d="M16 36v-10" fill="none" stroke="#17171c" stroke-width="2.5"/><circle cx="14" cy="36" r="3"/><path d="M16 26l5 3" stroke="#17171c" stroke-width="2.5"/></g>' +
+        '</g>' +
+        '<g class="agi-extra stars" fill="#ffd60a">' +
+          '<path class="agi-stroke" stroke-width="2" d="M40 14l2 4 4 1-3 3 1 4-4-2-4 2 1-4-3-3 4-1z"/>' +
+          '<path class="agi-stroke" stroke-width="2" d="M80 14l2 4 4 1-3 3 1 4-4-2-4 2 1-4-3-3 4-1z"/>' +
+          '<path class="agi-stroke" stroke-width="2" d="M60 4l2 4 4 1-3 3 1 4-4-2-4 2 1-4-3-3 4-1z"/>' +
+        '</g>' +
+        '<g class="agi-extra puff" fill="#d9d9e3" stroke="#17171c" stroke-width="2"><circle cx="26" cy="104" r="7"/><circle cx="94" cy="104" r="6"/></g>' +
+        '<path class="agi-extra sweat agi-stroke" d="M90 40c4 6 6 9 6 12a6 6 0 0 1-12 0c0-3 2-6 6-12z" fill="#7fd8ff"/>' +
+        '<g class="agi-extra zzz" fill="none" stroke="#17171c" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">' +
+          '<path d="M92 18h9l-9 10h9"/><path d="M104 6h6l-6 7h6"/>' +
+        '</g>' +
+      '</g>' +
+    '</svg>';
+  }
+
+  // ---------- looks ----------
+  function setColor(name) {
+    var c = COLORS[name] || COLORS.sky;
+    colorName = name;
+    art.style.setProperty('--agi-body', c[0]);
+    art.style.setProperty('--agi-wing', c[1]);
+  }
+  function setFace(face, hold) {
+    clearTimeout(faceTimer);
+    art.setAttribute('data-face', face);
+    if (face !== 'normal' && !asleep) faceTimer = setTimeout(function () { if (!asleep) art.setAttribute('data-face', 'normal'); }, hold || 1900);
+  }
+  function play(motion) {
+    if (!motion || reduceMotion) return;
+    bob.className.baseVal = 'agi-bob';
+    void bob.getBoundingClientRect();
+    bob.className.baseVal = 'agi-bob a-' + motion;
+  }
+  bob.addEventListener('animationend', function (e) { if (e.target === bob) bob.className.baseVal = 'agi-bob'; });
+  function extra(name, ms) {
+    clearTimeout(extraTimer);
+    art.classList.remove('show-sparkles', 'show-sweat', 'show-zzz', 'show-hearts', 'show-notes', 'show-stars', 'show-puff');
+    if (!name) return;
+    art.classList.add('show-' + name);
+    extraTimer = setTimeout(function () { art.classList.remove('show-' + name); }, ms || (name === 'zzz' || name === 'notes' ? 2600 : 1700));
+  }
+  function say(text) {
+    if (!text) return;
+    clearTimeout(bubbleTimer);
+    bubble.textContent = text;
+    bubble.classList.add('on');
+    bubbleTimer = setTimeout(function () { bubble.classList.remove('on'); }, Math.min(5200, 1700 + text.length * 45));
+  }
+  function pick(list) { return list[Math.floor(Math.random() * list.length)]; }
+  function maybe(lines) { return Math.random() < 0.35 ? pick(lines) : null; }
+  function act(face, motion, extraName, color, line, hold) {
+    if (color) setColor(color);
+    setFace(face, hold || 2200);
+    play(motion);
+    extra(extraName);
+    if (line) say(line);
+  }
+
+  // ---------- position ----------
+  function size() { return wrap.offsetWidth || 92; }
+  function restLine() {
+    var bar = document.querySelector('.tabbar');
+    var barH = bar && getComputedStyle(bar).display !== 'none' ? bar.offsetHeight : 0;
+    return document.documentElement.clientHeight - size() - Math.max(barH + 8, 18);
+  }
+  function maxX() { return Math.max(0, document.documentElement.clientWidth - size() - 12); }
+  function coords() {
+    var x = 12 + pos.fx * (maxX() - 12);
+    var y = Math.max(8, restLine() - pos.lift);
+    return { x: x, y: y };
+  }
+  function place(mode, ms) {
+    var c = coords();
+    wrap.classList.remove('walking', 'settle');
+    if (mode) { wrap.style.setProperty('--walk-ms', (ms || 2000) + 'ms'); wrap.classList.add(mode); }
+    wrap.style.setProperty('--agi-x', c.x.toFixed(1) + 'px');
+    wrap.style.setProperty('--agi-y', c.y.toFixed(1) + 'px');
+    wrap.classList.toggle('flip', c.x + size() / 2 < document.documentElement.clientWidth / 2);
+  }
+  function saveSpot() { try { localStorage.setItem(SPOT, JSON.stringify(pos)); } catch (e) {} }
+  window.addEventListener('resize', function () { if (!dragging) place(); });
+
+  // ---------- behaviour ----------
+  /**
+   * React to something that happened. Higher-priority reactions win for a
+   * moment, so a click that starts a search shows "loading", not "click".
+   */
+  function react(type, message, options) {
+    if (wrap.hidden) return;
+    var r = REACTIONS[type];
+    if (!r) return;
+    var now = Date.now();
+    if (r[4] < lastPriority && now - lastAt < 700) return;
+    options = options || {};
+    if (asleep && type !== 'grab') {
+      wakeUp(type === 'poke' || type === 'click');
+      if (type === 'poke' || type === 'click') return;
+    }
+    if (walking) stopWalking();
+    lastPriority = r[4]; lastAt = now;
+
+    var color = options.color || r[0];
+    if (!color && type === 'nav') color = ROUTE_COLORS[options.route || ''] || 'sky';
+    if (!color && (type === 'click' || type === 'poke' || type === 'drop')) {
+      color = pick(Object.keys(COLORS).filter(function (n) { return n !== colorName && n !== 'night'; }));
+    }
+    if (color) setColor(color);
+    setFace(r[1], options.hold);
+    play(r[2]);
+    extra(r[3]);
+    var line = message || (r[5] ? pick(r[5]) : '');
+    if (line) say(line);
+    resetIdle();
+  }
+
+  function fallAsleep() {
+    if (asleep || dragging || wrap.hidden) return;
+    if (walking) stopWalking();
+    asleep = true;
+    clearTimeout(faceTimer);
+    setColor('night');
+    art.setAttribute('data-face', 'sleepy');
+    art.classList.add('sleeping');
+    clearTimeout(extraTimer);
+    art.classList.remove('show-sparkles', 'show-sweat', 'show-hearts', 'show-notes', 'show-stars', 'show-puff');
+    art.classList.add('show-zzz');
+    if (Math.random() < 0.5) say(pick(['Zzz…', 'Just resting my eyes…', '*snore*']));
+  }
+  function wakeUp(withLine) {
+    if (!asleep) return;
+    asleep = false;
+    art.classList.remove('sleeping', 'show-zzz');
+    var r = REACTIONS.wake;
+    lastPriority = r[4]; lastAt = Date.now();
+    setColor(r[0]); setFace(r[1]); play(r[2]);
+    if (withLine) say(pick(r[5]));
+    resetIdle();
+  }
+  function resetIdle() {
+    clearTimeout(idleTimer);
+    var hour = new Date().getHours();
+    var late = hour >= 22 || hour < 6;
+    idleTimer = setTimeout(fallAsleep, late ? 25000 : 60000);
+  }
+
+  function walk() {
+    if (reduceMotion || dragging || asleep) return;
+    // Parked up high after a drag: flap in place instead of walking on air.
+    if (pos.lift > 0) { act('normal', 'flap'); return; }
+    var span = maxX() - 12;
+    if (span < 80) return;
+    var from = pos.fx;
+    // Wander a bit, mostly staying near the right side so content stays clear.
+    var floor = document.documentElement.clientWidth < 720 ? 0.72 : 0.55;
+    var to = Math.min(1, Math.max(floor, from + (Math.random() < 0.5 ? -1 : 1) * (0.15 + Math.random() * 0.3)));
+    if (Math.abs(to - from) < 0.08) to = from > 0.85 ? Math.max(floor, from - 0.25) : Math.min(1, from + 0.2);
+    if (Math.abs(to - from) < 0.05) return;
+    var px = Math.abs(to - from) * span;
+    var ms = Math.max(900, px * 22);
+    walking = true;
+    pos.fx = to;
+    art.classList.add('walking');
+    eyes.style.transform = 'translate(' + (to < from ? -2.6 : 2.6) + 'px,0)';
+    place('walking', ms);
+    clearTimeout(walkTimer);
+    walkTimer = setTimeout(function () { stopWalking(); act('normal', 'hop'); saveSpot(); }, ms);
+  }
+  function stopWalking() {
+    if (!walking) return;
+    walking = false;
+    clearTimeout(walkTimer);
+    art.classList.remove('walking');
+    // Freeze where Agi is right now so a reaction mid-walk does not teleport.
+    var m = new DOMMatrixReadOnly(getComputedStyle(wrap).transform);
+    var span = maxX() - 12;
+    if (span > 0) pos.fx = Math.min(1, Math.max(0, (m.m41 - 12) / span));
+    place();
+    eyes.style.transform = '';
+  }
+  function lookAround() {
+    if (reduceMotion) return;
+    setFace('normal');
+    var steps = [[-2.8, 0], [2.8, 0], [0, -2.2], [0, 0]], i = 0;
+    clearInterval(eyeTimer);
+    eyeTimer = setInterval(function () {
+      eyes.style.transform = 'translate(' + steps[i][0] + 'px,' + steps[i][1] + 'px)';
+      if (++i >= steps.length) clearInterval(eyeTimer);
+    }, 520);
+  }
+
+  function scheduleAntic() {
+    clearTimeout(anticTimer);
+    anticTimer = setTimeout(function () {
+      var quiet = Date.now() - lastAt > 6000 && Date.now() - lastUserAt > 2500;
+      if (quiet && !asleep && !dragging && !walking && !wrap.hidden && !document.hidden && !reduceMotion) {
+        var total = ANTICS.reduce(function (sum, a) { return sum + a[0]; }, 0), roll = Math.random() * total;
+        for (var i = 0; i < ANTICS.length; i++) { roll -= ANTICS[i][0]; if (roll <= 0) { ANTICS[i][1](); break; } }
+        lastAt = Date.now(); lastPriority = 0;
+      }
+      scheduleAntic();
+    }, 9000 + Math.random() * 11000);
+  }
+
+  // Blink every few seconds while the face is relaxed.
+  function scheduleBlink() {
+    blinkTimer = setTimeout(function () {
+      if (art.getAttribute('data-face') === 'normal') {
+        art.classList.add('blink');
+        setTimeout(function () { art.classList.remove('blink'); }, 130);
+      }
+      scheduleBlink();
+    }, 2800 + Math.random() * 3600);
+  }
+
+  // ---------- pointer: eyes, poke, pet, drag ----------
+  if (finePointer && !reduceMotion) {
+    var pending = false, px = 0, py = 0;
+    window.addEventListener('pointermove', function (e) {
+      px = e.clientX; py = e.clientY;
+      if (pending || walking || asleep) return;
+      pending = true;
+      requestAnimationFrame(function () {
+        pending = false;
+        var box = art.getBoundingClientRect();
+        var dx = px - (box.left + box.width / 2), dy = py - (box.top + box.height * 0.45);
+        var d = Math.max(1, Math.hypot(dx, dy));
+        eyes.style.transform = 'translate(' + (dx / d * 2.6).toFixed(2) + 'px,' + (dy / d * 2.2).toFixed(2) + 'px)';
+      });
+    }, { passive: true });
+  }
+
+  var press = null, suppressClick = false, clicks = [], rub = 0, rubAt = 0, lastRubX = null;
+  btn.addEventListener('pointerdown', function (e) {
+    if (e.button !== 0) return;
+    var c = coords();
+    press = { id: e.pointerId, sx: e.clientX, sy: e.clientY, ox: e.clientX - c.x, oy: e.clientY - c.y, t: Date.now(), moved: false };
+    try { btn.setPointerCapture(e.pointerId); } catch (err) { /* dragging still works while the pointer stays on Agi */ }
+    if (e.pointerType !== 'mouse') {
+      press.longTimer = setTimeout(function () { if (press && !press.moved) { suppressClick = true; react('pet'); } }, 550);
+    }
+  });
+  btn.addEventListener('pointermove', function (e) {
+    if (press && press.id === e.pointerId) {
+      if (!press.moved && Math.hypot(e.clientX - press.sx, e.clientY - press.sy) > 6) {
+        press.moved = true;
+        clearTimeout(press.longTimer);
+        startDrag();
+      }
+      if (dragging) {
+        var x = Math.min(maxX(), Math.max(12, e.clientX - press.ox));
+        var y = Math.min(restLine(), Math.max(8, e.clientY - press.oy));
+        var span = maxX() - 12;
+        pos.fx = span > 0 ? (x - 12) / span : 1;
+        pos.lift = restLine() - y;
+        wrap.style.setProperty('--agi-x', x.toFixed(1) + 'px');
+        wrap.style.setProperty('--agi-y', y.toFixed(1) + 'px');
+      }
+      return;
+    }
+    // Rubbing back and forth over Agi with a mouse counts as petting.
+    if (e.pointerType === 'mouse' && !dragging) {
+      var now = Date.now();
+      if (now - rubAt > 900) rub = 0;
+      if (lastRubX !== null) rub += Math.abs(e.clientX - lastRubX);
+      lastRubX = e.clientX; rubAt = now;
+      if (rub > 260) { rub = 0; react('pet'); }
+    }
+  });
+  btn.addEventListener('pointerleave', function () { lastRubX = null; });
+  function endPress(e) {
+    if (!press || press.id !== e.pointerId) return;
+    clearTimeout(press.longTimer);
+    if (dragging) endDrag();
+    press = null;
+  }
+  btn.addEventListener('pointerup', endPress);
+  btn.addEventListener('pointercancel', endPress);
+  btn.addEventListener('click', function (e) {
+    if (suppressClick) { suppressClick = false; e.preventDefault(); return; }
+    lastUserAt = Date.now();
+    var now = Date.now();
+    clicks = clicks.filter(function (t) { return now - t < 1400; });
+    clicks.push(now);
+    if (clicks.length >= 4) { clicks = []; react('dizzy'); return; }
+    react('poke', pick(TIPS));
+  });
+  function startDrag() {
+    if (walking) stopWalking();
+    if (asleep) wakeUp(false);
+    dragging = true;
+    suppressClick = true;
+    wrap.classList.remove('walking', 'settle');
+    wrap.classList.add('dragging');
+    art.classList.add('dragging');
+    react('grab');
+  }
+  function endDrag() {
+    dragging = false;
+    wrap.classList.remove('dragging');
+    art.classList.remove('dragging');
+    // Settle onto the resting line if dropped close to it.
+    if (pos.lift < 40) pos.lift = 0;
+    place('settle');
+    saveSpot();
+    lastAt = 0;
+    react('drop', pick(['Thanks for the lift.', 'Nice view from here.', 'New spot. I like it.']));
+  }
+
+  // ---------- page-wide hooks ----------
+  document.addEventListener('pointerdown', function (e) {
+    lastUserAt = Date.now();
+    var t = e.target.closest && e.target.closest('button, a, .chip, .tile, .check-chip, select, .switch');
+    if (!t || root.contains(t)) return;
+    react('click');
+  });
+  var changeTimer;
+  document.addEventListener('input', function (e) {
+    lastUserAt = Date.now();
+    if (root.contains(e.target)) return;
+    clearTimeout(changeTimer);
+    changeTimer = setTimeout(function () { react('change'); }, 250);
+  });
+  document.addEventListener('keydown', function () { lastUserAt = Date.now(); });
+  btn.addEventListener('mouseenter', function () { if (Date.now() - lastAt > 1500 && !asleep) play('wave'); });
+  root.querySelector('.agi-close').addEventListener('click', function () { hide(true); });
+  if (returnBtn) returnBtn.addEventListener('click', function () { show(true); react('hello', 'I\'m back! Did you miss me?'); });
+
+  function hide(save) {
+    wrap.hidden = true;
+    if (returnBtn) returnBtn.hidden = false;
+    if (save) try { localStorage.setItem(STORE, '1'); } catch (e) {}
+  }
+  function show(save) {
+    wrap.hidden = false;
+    if (returnBtn) returnBtn.hidden = true;
+    place();
+    if (save) try { localStorage.removeItem(STORE); } catch (e) {}
+  }
+  var hiddenPref = false;
+  try { hiddenPref = localStorage.getItem(STORE) === '1'; } catch (e) {}
+  if (hiddenPref) hide(false);
+
+  place();
+  // Fonts and the tab bar can change the layout after load.
+  setTimeout(function () { if (!dragging && !walking) place(); }, 400);
+  scheduleBlink();
+  scheduleAntic();
+  resetIdle();
+  return { react: react, setColor: setColor };
+})();
+</script>

@@ -1,0 +1,1608 @@
+<script>
+(function () {
+  'use strict';
+
+  var B = window.BOOT;
+  var ACCOUNT = B.account;
+  var main = document.getElementById('main');
+  var VENUES = B.venues;
+  var venueByKey = {};
+  VENUES.forEach(function (v) { venueByKey[key(v.name)] = v; });
+  var agi = window.Agi || { react: function () {} };
+
+  // ---------- helpers ----------
+  function $(sel, root) { return (root || document).querySelector(sel); }
+  function $all(sel, root) { return Array.prototype.slice.call((root || document).querySelectorAll(sel)); }
+  function esc(text) {
+    return String(text == null ? '' : text).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+  function key(text) { return String(text || '').trim().toLowerCase().replace(/\s+/g, ' '); }
+  function clock(min) {
+    var h = Math.floor(min / 60) % 24, m = min % 60;
+    return (h % 12 === 0 ? 12 : h % 12) + ':' + (m < 10 ? '0' : '') + m + ' ' + (h < 12 ? 'AM' : 'PM');
+  }
+  function hhmm(min) { var h = Math.floor(min / 60), m = min % 60; return (h < 10 ? '0' : '') + h + ':' + (m < 10 ? '0' : '') + m; }
+  function toMinutes(text) { var m = /^(\d{1,2}):(\d{2})/.exec(text || ''); return m ? Number(m[1]) * 60 + Number(m[2]) : null; }
+  function duration(min) { var h = Math.floor(min / 60), m = min % 60; return (h ? h + 'h' : '') + (h && m ? ' ' : '') + (m ? m + 'm' : ''); }
+  function parseISO(s) { var p = s.split('-').map(Number); return new Date(p[0], p[1] - 1, p[2]); }
+  function iso(d) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+  function addDays(s, n) { var d = parseISO(s); d.setDate(d.getDate() + n); return iso(d); }
+  function dayLabel(s) {
+    var label = parseISO(s).toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
+    var rest = label.split(', ').slice(1).join(', ');
+    if (s === B.today) return 'Today, ' + rest;
+    if (s === addDays(B.today, 1)) return 'Tomorrow, ' + rest;
+    return label;
+  }
+  function shortDate(s) { return parseISO(s).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }); }
+  function datesBetween(a, b) { var out = [], d = a; while (d <= b && out.length < 60) { out.push(d); d = addDays(d, 1); } return out; }
+  function plural(n, word) { return n + ' ' + word + (n === 1 ? '' : 's'); }
+  function debounce(fn, ms) { var t; return function () { var a = arguments; clearTimeout(t); t = setTimeout(function () { fn.apply(null, a); }, ms); }; }
+  function storageGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+  function storageSet(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+  function toast(message) {
+    var el = document.createElement('div');
+    el.className = 'toast';
+    el.textContent = message;
+    $('#toasts').appendChild(el);
+    setTimeout(function () { el.style.opacity = '0'; el.style.transform = 'translateY(8px)'; }, 2800);
+    setTimeout(function () { el.remove(); }, 3100);
+  }
+
+  // ---------- custom illustrations ----------
+  var ART = {
+    // A calendar page being scanned: free slots light up in lime, busy ones grey, then a tick.
+    loader: function () {
+      var busy = { 1: 1, 6: 1, 8: 1 }, cells = '';
+      for (var i = 0; i < 12; i++) {
+        var col = i % 4, row = Math.floor(i / 4);
+        cells += '<rect class="cell' + (busy[i] ? ' busy' : '') + '" x="' + (15 + col * 16.5) + '" y="' + (38 + row * 14) + '" width="12" height="10" rx="3" style="--d:' + (row * 4 + col) + '"/>';
+      }
+      return '<svg class="cal-loader" viewBox="0 0 96 96" aria-hidden="true">' +
+        '<rect class="page" x="8" y="14" width="80" height="76" rx="14"/>' +
+        '<path class="top" d="M8 28a14 14 0 0 1 14-14h52a14 14 0 0 1 14 14v2H8z"/>' +
+        '<path class="ring" d="M30 8v12M66 8v12"/>' + cells +
+        '<rect class="scan" x="11" y="35" width="74" height="12" rx="4"/>' +
+        '<circle class="tick-bg" cx="74" cy="78" r="13"/><path class="tick" d="M67 78l5 5 9-10"/>' +
+      '</svg>';
+    },
+    search: '<svg viewBox="0 0 72 72" aria-hidden="true"><rect x="6" y="12" width="44" height="40" rx="8" fill="var(--card)" stroke="var(--edge)" stroke-width="3"/><path d="M6 24h44" stroke="var(--edge)" stroke-width="3"/><rect x="14" y="31" width="9" height="7" rx="2" fill="var(--hair)"/><rect x="28" y="31" width="9" height="7" rx="2" fill="var(--cobalt)"/><circle cx="48" cy="46" r="11" fill="var(--lemon)" stroke="var(--edge)" stroke-width="3"/><path d="M56 54l9 9" stroke="var(--edge)" stroke-width="4" stroke-linecap="round"/></svg>',
+    check: '<svg viewBox="0 0 72 72" aria-hidden="true"><rect x="10" y="10" width="52" height="52" rx="12" fill="var(--mint)" stroke="var(--edge)" stroke-width="3"/><path d="M23 37l9 9 17-19" fill="none" stroke="var(--edge)" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+    send: '<svg viewBox="0 0 72 72" aria-hidden="true"><rect x="8" y="14" width="40" height="48" rx="7" fill="var(--card)" stroke="var(--edge)" stroke-width="3"/><path d="M16 28h24M16 37h24M16 46h14" stroke="var(--hair)" stroke-width="4" stroke-linecap="round"/><path d="M38 34l28-16-10 34-7-11z" fill="var(--pink)" stroke="var(--edge)" stroke-width="3" stroke-linejoin="round"/></svg>',
+    empty: '<svg viewBox="0 0 112 112" aria-hidden="true"><rect x="16" y="22" width="80" height="70" rx="14" fill="var(--card)" stroke="var(--edge)" stroke-width="3.5"/><path d="M16 42h80" stroke="var(--edge)" stroke-width="3.5"/><path d="M36 14v14M76 14v14" stroke="var(--edge)" stroke-width="3.5" stroke-linecap="round"/><path d="M42 62c4-4 8-4 12 0M58 62c4-4 8-4 12 0" fill="none" stroke="var(--edge)" stroke-width="3" stroke-linecap="round"/><path d="M48 78c5-3 11-3 16 0" fill="none" stroke="var(--edge)" stroke-width="3" stroke-linecap="round"/><path d="M88 10l3 6 6 3-6 3-3 6-3-6-6-3 6-3z" fill="var(--lemon)" stroke="var(--edge)" stroke-width="2.5"/></svg>',
+    oops: '<svg viewBox="0 0 112 112" aria-hidden="true"><path d="M30 78c-12 0-20-8-20-19 0-10 8-18 18-18 3-13 14-21 27-21 15 0 27 11 28 25 10 1 18 9 18 19 0 8-7 14-15 14z" fill="var(--card)" stroke="var(--edge)" stroke-width="3.5" stroke-linejoin="round"/><path d="M42 52l8 8M50 52l-8 8M62 52l8 8M70 52l-8 8" stroke="var(--edge)" stroke-width="3" stroke-linecap="round"/><path d="M48 70c5-4 11-4 16 0" fill="none" stroke="var(--edge)" stroke-width="3" stroke-linecap="round"/><path d="M40 90l-4 10M56 90v12M72 90l4 10" stroke="var(--coral)" stroke-width="4" stroke-linecap="round"/></svg>',
+    lock: '<svg viewBox="0 0 112 112" aria-hidden="true"><path d="M36 50V38a20 20 0 0 1 40 0v12" fill="none" stroke="var(--edge)" stroke-width="5"/><rect x="24" y="48" width="64" height="48" rx="12" fill="var(--lemon)" stroke="var(--edge)" stroke-width="3.5"/><circle cx="56" cy="68" r="6" fill="var(--edge)"/><path d="M56 72v10" stroke="var(--edge)" stroke-width="5" stroke-linecap="round"/><path d="M94 22l3 6 6 3-6 3-3 6-3-6-6-3 6-3z" fill="var(--card)" stroke="var(--edge)" stroke-width="2.5"/></svg>',
+    key: '<svg viewBox="0 0 112 112" aria-hidden="true"><circle cx="38" cy="56" r="20" fill="var(--lemon)" stroke="var(--edge)" stroke-width="3.5"/><circle cx="38" cy="56" r="7" fill="var(--card)" stroke="var(--edge)" stroke-width="3"/><path d="M58 56h40M84 56v14M96 56v10" stroke="var(--edge)" stroke-width="5" stroke-linecap="round"/></svg>',
+    squiggle: '<svg viewBox="0 0 300 30" preserveAspectRatio="none" aria-hidden="true"><path d="M4 20c30-14 52-14 76 0s48 14 72 0 50-14 74 0 46 12 70 0"/></svg>',
+  };
+  function loader(text, rows) {
+    return '<div class="loader" role="status">' + ART.loader() + '<p>' + esc(text) + '</p></div>' +
+      (rows ? '<div class="skeleton" aria-hidden="true"><span></span><span></span><span></span></div>' : '');
+  }
+  function emptyState(art, title, text, action) {
+    return '<div class="empty">' + art + '<h3>' + esc(title) + '</h3><p>' + esc(text) + '</p>' + (action || '') + '</div>';
+  }
+
+  // ---------- motion helpers ----------
+  var REDUCED = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  // Counts a number up from zero, easing out, so the live count reads as fresh.
+  function countUp(el) {
+    if (!el) return;
+    var target = Number(el.getAttribute('data-count')) || 0;
+    if (REDUCED || target < 2) { el.textContent = target; return; }
+    var t0 = performance.now(), ms = 900;
+    (function frame(now) {
+      var p = Math.min(1, (now - t0) / ms), eased = 1 - Math.pow(1 - p, 3);
+      el.textContent = Math.round(target * eased);
+      if (p < 1) requestAnimationFrame(frame);
+    })(t0);
+  }
+  // Sections and cards rise in as they scroll into view.
+  var revealer = 'IntersectionObserver' in window && !REDUCED ? new IntersectionObserver(function (entries) {
+    entries.forEach(function (e) {
+      if (!e.isIntersecting) return;
+      e.target.classList.add('in');
+      revealer.unobserve(e.target);
+    });
+  }, { rootMargin: '0px 0px -8% 0px', threshold: 0.12 }) : null;
+  function revealify(root) {
+    var targets = $all('.section .section-title, .section .section-lead, .flow-list, .bento, .plans, .venue-grid > *, .access-grid > *', root);
+    targets.forEach(function (el, i) {
+      if (!revealer) { el.classList.add('in'); return; }
+      if (!el.classList.contains('flow-list')) el.classList.add('reveal');
+      el.style.setProperty('--rd', String(i % 4));
+      revealer.observe(el);
+    });
+  }
+
+  // ---------- plan & usage ----------
+  var PRO = ACCOUNT.plan === 'pro';
+  var LIMIT_NAMES = { search: 'slot searches', schedule: 'schedule lookups', check: 'calendar checks', link: 'request links', request: 'access requests' };
+  function left(kind) {
+    var limit = (ACCOUNT.limits || {})[kind] || 0;
+    var used = (ACCOUNT.usage || {})[kind] || 0;
+    return Math.max(0, limit - used);
+  }
+  function noteUsage(u) {
+    if (!u || !u.kind) return;
+    ACCOUNT.usage = ACCOUNT.usage || {};
+    ACCOUNT.usage[u.kind] = u.used;
+    drawPlanChip();
+    var m = $('[data-meter="' + u.kind + '"]');
+    if (m) m.outerHTML = meter(u.kind);
+  }
+  function meter(kind) {
+    var limit = (ACCOUNT.limits || {})[kind] || 0;
+    if (!limit || limit > 50) return '';
+    var used = Math.min(limit, (ACCOUNT.usage || {})[kind] || 0);
+    var cells = '';
+    for (var i = 0; i < limit && limit <= 10; i++) cells += '<span class="' + (i < used ? 'used' : '') + '"></span>';
+    return '<span class="meter" data-meter="' + kind + '"><span class="cells" aria-hidden="true">' + cells + '</span>' +
+      (limit - used) + ' of ' + limit + ' ' + LIMIT_NAMES[kind] + ' left today</span>';
+  }
+  function drawPlanChip() {
+    var chip = $('#planChip');
+    if (ACCOUNT.plan === 'none') { chip.textContent = 'Sign in'; return; }
+    chip.className = 'plan-chip' + (PRO ? ' pro' : '');
+    chip.innerHTML = PRO ? '<span class="tag">PRO</span><span class="label-long">Plan</span>'
+      : '<span class="tag">FREE</span><span class="num">' + left('search') + '</span><span class="label-long">' + (left('search') === 1 ? 'search' : 'searches') + ' left</span>';
+  }
+
+  // ---------- theme ----------
+  function applyTheme(theme) {
+    if (theme) document.documentElement.setAttribute('data-theme', theme);
+    else document.documentElement.removeAttribute('data-theme');
+    var dark = theme ? theme === 'dark' : window.matchMedia('(prefers-color-scheme: dark)').matches;
+    $('#themeToggle i').className = 'ph-bold ' + (dark ? 'ph-sun' : 'ph-moon');
+    return dark;
+  }
+  applyTheme(storageGet('heTheme'));
+  $('#themeToggle').addEventListener('click', function () {
+    var current = document.documentElement.getAttribute('data-theme') ||
+      (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+    var next = current === 'dark' ? 'light' : 'dark';
+    storageSet('heTheme', next);
+    agi.react(applyTheme(next) ? 'dark' : 'light');
+  });
+
+  // ---------- account: switch or sign out ----------
+  // The page can't sign anyone out itself, so both options go through Google's
+  // own pages and then come back here.
+  var HOME_URL = B.execUrl || '';
+  var SWITCH_URL = 'https://accounts.google.com/AccountChooser?continue=' + encodeURIComponent(HOME_URL);
+  var SIGNOUT_URL = 'https://accounts.google.com/Logout?continue=' + encodeURIComponent(SWITCH_URL);
+  function accountMenu() {
+    var email = ACCOUNT.email || '';
+    var plan = ACCOUNT.plan === 'pro' ? 'PRO' : ACCOUNT.plan === 'free' ? 'FREE' : 'NO ACCESS';
+    return '<div class="acct-head"><span class="muted">' + (email ? 'Signed in as' : 'Not signed in') + '</span>' +
+        (email ? '<span class="acct-email">' + esc(email) + '</span>' : '') +
+        '<span class="acct-plan' + (ACCOUNT.plan === 'pro' ? ' pro' : '') + '">' + plan + '</span></div>' +
+      (ACCOUNT.plan !== 'none' ? '<a class="acct-item" href="#/access" data-nav><i class="ph-bold ph-key" aria-hidden="true"></i>Your plan</a>' +
+        '<a class="acct-item" href="#/report" data-nav><i class="ph-bold ph-megaphone-simple" aria-hidden="true"></i>Report an issue</a>' : '') +
+      '<a class="acct-item" href="' + esc(SWITCH_URL) + '" target="_top" data-acct="switch"><i class="ph-bold ph-users-three" aria-hidden="true"></i>Switch account</a>' +
+      '<a class="acct-item danger" href="' + esc(SIGNOUT_URL) + '" target="_top" data-acct="signout"><i class="ph-bold ph-sign-out" aria-hidden="true"></i><span>Sign out</span></a>' +
+      '<p class="acct-note" id="acctNote">Tip: if lookups fail, you may have several Google accounts signed in. Switch to your @' + esc(ACCOUNT.domain || 'student.ateneo.edu') + ' one.</p>';
+  }
+  (function setupAccount() {
+    var btn = $('#acctBtn'), menu = $('#acctMenu');
+    if (!btn || !menu) return;
+    $('#acctInitial').textContent = ACCOUNT.email ? ACCOUNT.email.charAt(0).toUpperCase() : '?';
+    btn.title = ACCOUNT.email || 'Not signed in';
+    function close(focus) {
+      if (menu.hidden) return;
+      menu.hidden = true;
+      btn.setAttribute('aria-expanded', 'false');
+      if (focus) btn.focus();
+    }
+    function open() {
+      menu.innerHTML = accountMenu();
+      menu.hidden = false;
+      btn.setAttribute('aria-expanded', 'true');
+      var first = menu.querySelector('.acct-item');
+      if (first) first.focus();
+    }
+    btn.addEventListener('click', function () { if (menu.hidden) open(); else close(true); });
+    menu.addEventListener('click', function (e) {
+      var item = e.target.closest('.acct-item');
+      if (!item) return;
+      var kind = item.getAttribute('data-acct');
+      if (kind === 'signout' && !item.classList.contains('armed')) {
+        // First click explains what happens; the second one signs out.
+        e.preventDefault();
+        item.classList.add('armed');
+        item.querySelector('span').textContent = 'Sign out of all accounts';
+        $('#acctNote').textContent = 'Google signs you out of every account in this browser, then asks which one to use. You come back here after.';
+        agi.react('locked', 'Sure? That signs out every Google account here.');
+        return;
+      }
+      if (kind) { agi.react('bye'); return; }
+      close(false);
+    });
+    document.addEventListener('pointerdown', function (e) { if (!menu.hidden && !e.target.closest('.acct')) close(false); });
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape') close(true); });
+  })();
+
+  // ---------- server calls ----------
+  function api(fn, args) {
+    args = args || [];
+    var pre = B.prefetch;
+    if (pre && pre.fn === fn && JSON.stringify(pre.args) === JSON.stringify(args)) {
+      B.prefetch = null;
+      return pre.error ? Promise.reject(new Error(pre.error)) : Promise.resolve(pre.result);
+    }
+    return new Promise(function (resolve, reject) {
+      if (!window.google || !google.script || !google.script.run) {
+        reject(new Error('Open the portal from its link to use this.'));
+        return;
+      }
+      var runner = google.script.run.withSuccessHandler(resolve).withFailureHandler(reject);
+      runner[fn].apply(runner, args);
+    });
+  }
+  function reloadUrl(fn, args, view, viewState) {
+    if (!B.execUrl) return '';
+    return B.execUrl + '?view=' + encodeURIComponent(view) +
+      '&state=' + encodeURIComponent(JSON.stringify(viewState || {})) +
+      '&q=' + encodeURIComponent(JSON.stringify({ fn: fn, args: args }));
+  }
+  // Server errors carry a code: LIMIT:<kind>, PRO:<feature>, ACCESS:<text>.
+  function errorCode(error) {
+    var m = /(LIMIT|PRO|ACCESS):(.*)$/.exec((error && error.message) || '');
+    return m ? { type: m[1], what: m[2].trim() } : null;
+  }
+  function friendlyError(error) {
+    var code = errorCode(error);
+    if (code && code.type === 'LIMIT') return 'You have used today\'s free ' + (LIMIT_NAMES[code.what] || 'lookups') + '. They reset at midnight, or go Pro for more.';
+    if (code && code.type === 'PRO') return code.what === 'range' ? 'Free searches cover one day at a time. Pro searches up to 14 days.' : 'That is a Pro feature.';
+    if (code && code.type === 'ACCESS') return code.what;
+    var msg = (error && error.message) || '';
+    if (/authorization is required|authorisation/i.test(msg)) {
+      return 'The site needs its owner to approve new permissions. Let the site owner know, then try again.';
+    }
+    if (!msg || /server error|paumanhin|we're sorry|authorization/i.test(msg)) {
+      return 'Google blocked the live request. This usually happens when several Google accounts are signed in. A page reload runs it another way.';
+    }
+    return msg.replace(/^(Exception|Error):\s*/, '');
+  }
+  // The last thing that went wrong, offered on the report page.
+  var LAST_ERROR = '';
+  function rememberError(error) {
+    LAST_ERROR = ((current ? (ROUTE_NAMES[current] || current) + ': ' : '') + ((error && error.message) || String(error || ''))).slice(0, 300);
+  }
+  var ROUTE_NAMES = { '': 'Home', find: 'Find a slot', schedule: 'Schedule', venues: 'Venues', book: 'Book', access: 'Plan', report: 'Report' };
+  function failureBlock(error, retryUrl) {
+    var code = errorCode(error);
+    if (code && (code.type === 'LIMIT' || code.type === 'PRO')) {
+      agi.react(code.type === 'LIMIT' ? 'limit' : 'locked', code.type === 'LIMIT' ? 'That\'s all the free ones for today.' : null);
+      return emptyState(ART.lock, code.type === 'LIMIT' ? 'Out of free lookups for today' : 'Pro feature', friendlyError(error),
+        '<a class="btn btn-lemon" href="#/access" data-nav>See plans</a>');
+    }
+    agi.react('error');
+    rememberError(error);
+    return emptyState(ART.oops, 'That lookup didn\'t go through', friendlyError(error),
+      '<div class="gate-actions">' + (retryUrl ? '<a class="btn btn-primary" href="' + esc(retryUrl) + '" target="_top">Try again with a page reload</a>' : '') +
+      '<a class="btn" href="' + esc(SWITCH_URL) + '" target="_top"><i class="ph-bold ph-users-three" aria-hidden="true"></i>Switch account</a>' +
+      '<a class="btn" href="#/report" data-nav><i class="ph-bold ph-megaphone-simple" aria-hidden="true"></i>Report it</a></div>');
+  }
+
+  // ---------- routing ----------
+  var ROUTES = { '': renderHome, find: renderFind, schedule: renderSchedule, venues: renderVenues, book: renderBook, access: renderAccess, report: renderReport };
+  var current = null;
+  var HISTORY = window.google && google.script && google.script.history ? google.script.history : null;
+
+  function cleanRoute(r) { r = String(r || '').replace(/^#?\/?/, '').split('?')[0]; return ROUTES.hasOwnProperty(r) ? r : ''; }
+  function go(route, patch) {
+    route = cleanRoute(route);
+    if (patch) Object.assign(state[route], patch);
+    if (HISTORY) {
+      try { if (route !== current) HISTORY.push({ route: route }, {}, '/' + route); } catch (e) { /* the view still changes */ }
+      show(route);
+    } else if (cleanRoute(location.hash) !== route) {
+      location.hash = '#/' + route;
+    } else {
+      show(route);
+    }
+  }
+  function show(route) {
+    var next = cleanRoute(route);
+    if (next === 'report' && current !== 'report') state.report.from = current || '';
+    var changed = next !== current;
+    current = next;
+    $all('[data-route]').forEach(function (a) {
+      if (a.getAttribute('data-route') === current) a.setAttribute('aria-current', 'page');
+      else a.removeAttribute('aria-current');
+    });
+    main.className = '';
+    void main.offsetWidth;
+    main.className = 'view-enter';
+    if (ACCOUNT.plan === 'none' && current !== '') renderGate();
+    else ROUTES[current]();
+    revealify(main);
+    window.scrollTo(0, 0);
+    if (changed) agi.react('nav', null, { route: current });
+  }
+  if (HISTORY) HISTORY.setChangeHandler(function (e) { show((e.state && e.state.route) || (e.location && e.location.hash) || ''); });
+  else window.addEventListener('hashchange', function () { show(location.hash); });
+  document.addEventListener('click', function (event) {
+    var link = event.target.closest('[data-nav]');
+    if (!link) return;
+    event.preventDefault();
+    go(link.getAttribute('href'));
+  });
+
+  // ---------- state ----------
+  var defaultType = B.types.indexOf('Classrooms') !== -1 ? 'Classrooms' : '';
+  var state = {
+    '': {},
+    find: { startDate: B.today, endDate: B.today, type: defaultType, building: '', minCapacity: '', airCon: false, minFree: '60',
+      timeMode: 'any', fromTime: '', toTime: '', text: '', equipment: '', maxCapacity: '', days: 'all', sort: 'earliest', result: null },
+    schedule: { venue: '', startDate: B.today, endDate: PRO ? addDays(B.today, 6) : B.today, result: null },
+    venues: { q: '', type: '', building: '', airCon: false, minCapacity: '' },
+    book: { venue: '', date: B.today, startTime: '', endTime: '', participants: '', eventTitle: '', proofLink: '',
+      nature: B.form.eventDefaults.nature || '', conditions: (B.form.eventDefaults.conditions || []).slice(),
+      activityDetails: B.form.eventDefaults.activityDetails || '', equipment: (B.form.eventDefaults.equipment || []).slice() },
+    access: {},
+    report: { kind: 'bug', page: '', message: '', from: '' },
+  };
+  if (B.view && state[B.view] && B.state) Object.assign(state[B.view], B.state);
+
+  function typeOptions(selected, allLabel) {
+    return '<option value="">' + esc(allLabel) + '</option>' + B.types.map(function (t) {
+      return '<option' + (t === selected ? ' selected' : '') + '>' + esc(t) + '</option>';
+    }).join('');
+  }
+  function buildingOptions(selected) {
+    return '<option value="">Any building</option>' + B.buildings.map(function (b) {
+      return '<option' + (b === selected ? ' selected' : '') + '>' + esc(b) + '</option>';
+    }).join('');
+  }
+  function venueFacts(v) {
+    var out = [];
+    if (v.capacity) out.push('<span class="badge"><i class="ph-bold ph-users" aria-hidden="true"></i>' + v.capacity + '</span>');
+    if (v.airCon === 'Yes') out.push('<span class="badge badge-ok"><i class="ph-bold ph-snowflake" aria-hidden="true"></i>Air-con</span>');
+    if (v.airCon === 'No') out.push('<span class="badge">No air-con</span>');
+    return out.join('');
+  }
+  function venueDatalist() {
+    return '<datalist id="venueNames">' + VENUES.map(function (v) { return '<option value="' + esc(v.name) + '">'; }).join('') + '</datalist>';
+  }
+
+  // ---------- gate (not a student account) ----------
+  function renderGate() {
+    main.innerHTML = '<div class="page"><div class="wrap"><div class="panel">' +
+      emptyState(ART.lock, 'Student accounts only',
+        ACCOUNT.reason === 'domain'
+          ? 'You are signed in as ' + ACCOUNT.email + '. Switch to your @' + ACCOUNT.domain + ' account to use the portal.'
+          : 'Sign in with your @' + ACCOUNT.domain + ' account to use the portal.',
+        '<div class="gate-actions"><a class="btn btn-primary" href="' + esc(SWITCH_URL) + '" target="_top"><i class="ph-bold ph-users-three" aria-hidden="true"></i>Switch account</a>' +
+          '<a class="btn" href="' + esc(SIGNOUT_URL) + '" target="_top">Sign out of all accounts</a></div>') +
+      '</div></div></div>';
+  }
+
+  // ---------- home ----------
+  var FREE_LIMITS = { search: 3, schedule: 5, check: 15 };
+  if (ACCOUNT.plan === 'free') FREE_LIMITS = ACCOUNT.limits;
+
+  function renderHome() {
+    var counts = {};
+    VENUES.forEach(function (v) { counts[v.type] = (counts[v.type] || 0) + 1; });
+    var types = Object.keys(counts).sort(function (a, b) { return counts[b] - counts[a]; });
+
+    main.innerHTML =
+      '<section class="hero"><div class="wrap hero-grid">' +
+        '<div>' +
+          '<h1>' + words('Every free room in HE,', 0) + ' <span class="squiggle">' + words('on one page.', 5) + ART.squiggle + '</span></h1>' +
+          '<p class="lead">This site reads the CFMO calendars for all ' + VENUES.length + ' venues, so you don\'t have to open them one by one.</p>' +
+          '<div class="hero-actions">' +
+            '<a class="btn btn-primary" href="#/find" data-nav><i class="ph-bold ph-magnifying-glass" aria-hidden="true"></i>Find a free slot</a>' +
+            '<a class="btn" href="#/venues" data-nav>Browse venues</a>' +
+          '</div>' +
+        '</div>' +
+        '<div class="panel board">' +
+          '<div class="board-head"><h2>Free right now</h2><span class="live" id="liveTime">LIVE</span></div>' +
+          '<div id="boardBody">' + loader('Reading the boards…') + '</div>' +
+        '</div>' +
+      '</div></section>' +
+
+      '<section class="section" style="padding-top:24px"><div class="wrap flow">' +
+        '<div><h2 class="section-title">From search to a filled-in form.</h2>' +
+          '<p class="section-lead">Most bookings take about two minutes.</p></div>' +
+        '<ol class="flow-list">' +
+          flowItem(ART.search, 'Search', 'Pick a day and filter by building, size, air-con or an exact time. Each result is an open gap in that room\'s calendar.') +
+          flowItem(ART.check, 'Check', 'When you choose a time, the room\'s calendar is read again. A clash shows up before you send anything.') +
+          flowItem(ART.send, 'Book', 'Pro fills the official CFMO request form with your saved org details. You review it and submit.') +
+        '</ol>' +
+      '</div></section>' +
+
+      '<section class="section" style="padding-top:0"><div class="wrap">' +
+        '<h2 class="section-title">Browse by type</h2>' +
+        '<div class="bento stagger">' +
+          tile(types[0], counts[types[0]], 'tile-big', 0) +
+          tile(types[1], counts[types[1]], 'tile-lemon', 1) +
+          tile(types[2], counts[types[2]], 'tile-grid', 2) +
+          tile(types[3], counts[types[3]], 'tile-mint', 3) +
+          '<button class="tile tile-pink" data-type="" style="--i:4"><span class="count">' + types.length + '</span>' +
+            '<span class="label">All venue types <i class="ph-bold ph-arrow-right" aria-hidden="true"></i></span></button>' +
+        '</div>' +
+      '</div></section>' +
+
+      '<section class="section" style="padding-top:0"><div class="wrap">' +
+        '<h2 class="section-title">Free for every Ateneo student.</h2>' +
+        '<p class="section-lead">Pro is for officers who book every week. Ask for a key on the Plan page.</p>' +
+        planCards() +
+      '</div></section>';
+
+    $all('.tile', main).forEach(function (el) {
+      el.addEventListener('click', function () { go('venues', { type: el.getAttribute('data-type') }); });
+    });
+    loadFreeNow();
+  }
+  // Splits a headline into words that rise in one after another.
+  function words(text, start) {
+    return text.split(' ').map(function (w, i) { return '<span class="word" style="--w:' + (start + i) + '">' + esc(w) + '</span>'; }).join(' ');
+  }
+  function flowItem(art, title, text) {
+    return '<li class="panel-flat flow-item">' + art + '<div><h3>' + esc(title) + '</h3><p class="muted">' + esc(text) + '</p></div></li>';
+  }
+  function tile(type, count, cls, i) {
+    if (!type) return '';
+    return '<button class="tile ' + cls + '" data-type="' + esc(type) + '" style="--i:' + i + '"><span class="count">' + count + '</span>' +
+      '<span class="label">' + esc(type) + ' <i class="ph-bold ph-arrow-right" aria-hidden="true"></i></span></button>';
+  }
+  function planCards() {
+    return '<div class="plans">' +
+      '<div class="panel plan"><h3>Free</h3><p class="muted">For any @' + esc(ACCOUNT.domain || 'student.ateneo.edu') + ' account.</p><ul>' +
+        '<li><i class="ph-bold ph-check" aria-hidden="true"></i><span>' + FREE_LIMITS.search + ' slot searches a day, one day at a time</span></li>' +
+        '<li><i class="ph-bold ph-check" aria-hidden="true"></i><span>' + FREE_LIMITS.schedule + ' venue schedules a day</span></li>' +
+        '<li><i class="ph-bold ph-check" aria-hidden="true"></i><span>The live "free right now" board and the full venue directory</span></li>' +
+        '<li><i class="ph-bold ph-check" aria-hidden="true"></i><span>' + FREE_LIMITS.check + ' clash checks a day before you book</span></li>' +
+      '</ul></div>' +
+      '<div class="panel plan plan-pro"><h3>Pro <span class="badge badge-lock">KEY</span></h3><p class="muted">For org officers who book rooms every week.</p><ul>' +
+        '<li><i class="ph-bold ph-lightning" aria-hidden="true"></i><span>Search up to 14 days at once, many times a day</span></li>' +
+        '<li><i class="ph-bold ph-lightning" aria-hidden="true"></i><span>The CFMO request form filled in for you</span></li>' +
+        '<li><i class="ph-bold ph-lightning" aria-hidden="true"></i><span>Saved profiles for each org you book for</span></li>' +
+        '<li><i class="ph-bold ph-lightning" aria-hidden="true"></i><span>One key, tied to your account</span></li>' +
+      '</ul><div><a class="btn btn-lemon" href="#/access" data-nav>' + (PRO ? 'View your plan' : 'Get a Pro key') + '</a></div></div>' +
+    '</div>';
+  }
+  function loadFreeNow() {
+    var body = $('#boardBody');
+    api('apiFreeNow').then(function (data) {
+      if (!body.isConnected) return;
+      if (data.closed) {
+        $('#liveTime').textContent = 'CLOSED';
+        body.innerHTML = '<div class="board-count"><strong>Closed</strong></div><p class="muted" style="padding:0 18px 18px">Venues open at ' +
+          clock(data.opensAt) + '. Plan ahead with a search for tomorrow.</p>';
+        return;
+      }
+      $('#liveTime').textContent = 'LIVE ' + clock(data.nowMinute);
+      body.innerHTML = '<div class="board-count"><strong data-count="' + data.freeCount + '">0</strong><span class="muted">of ' + data.total + ' venues free</span></div>' +
+        '<div class="board-list stagger">' + data.venues.slice(0, 6).map(function (v, i) {
+          var info = venueByKey[key(v.venue)] || {};
+          return '<button class="board-row" data-venue="' + esc(v.venue) + '" data-until="' + v.until + '" style="--i:' + i + '">' +
+            '<span><strong>' + esc(v.venue) + '</strong><br><span class="muted small">' + esc(info.building || v.type) + '</span></span>' +
+            '<span class="until">until ' + clock(v.until) + '</span></button>';
+        }).join('') + '</div>';
+      countUp($('[data-count]', body));
+      $all('.board-row', body).forEach(function (row) {
+        row.addEventListener('click', function () {
+          var start = Math.ceil(data.nowMinute / 15) * 15;
+          go('book', { venue: row.getAttribute('data-venue'), date: B.today, startTime: hhmm(start),
+            endTime: hhmm(Math.min(Number(row.getAttribute('data-until')), start + 120)) });
+        });
+      });
+    }).catch(function (error) {
+      if (body.isConnected) body.innerHTML = failureBlock(error, reloadUrl('apiFreeNow', [], '', {}));
+    });
+  }
+
+  // ---------- find a slot ----------
+  function renderFind() {
+    var s = state.find, single = B.maximumDays <= 1;
+    if (single) s.endDate = s.startDate;
+    var open = s.timeMode !== 'any' || s.text || s.equipment || s.maxCapacity || s.days !== 'all';
+    main.innerHTML = '<div class="page"><div class="wrap">' +
+      '<div class="page-head"><div><h1>Find a free slot</h1>' +
+        '<p>Every result is an open gap in the room\'s calendar between ' + clock(B.hours.openingMinute) + ' and ' + clock(B.hours.closingMinute) + '.</p></div>' +
+        (PRO ? '' : meter('search')) + '</div>' +
+      '<form class="panel find-form" id="findForm" novalidate>' +
+        '<div class="filters' + (single ? ' single' : '') + '">' +
+          '<label class="field"><span>' + (single ? 'Day' : 'From') + '</span><input class="input" type="date" name="startDate" value="' + s.startDate + '" min="' + B.today + '"></label>' +
+          (single ? '' : '<label class="field"><span>To</span><input class="input" type="date" name="endDate" value="' + s.endDate + '" min="' + B.today + '"></label>') +
+          '<label class="field"><span>Type</span><select class="input" name="type">' + typeOptions(s.type, 'All types') + '</select></label>' +
+          '<label class="field"><span>Building</span><select class="input" name="building">' + buildingOptions(s.building) + '</select></label>' +
+          '<label class="field"><span>People</span><input class="input num" type="number" min="0" max="5000" inputmode="numeric" name="minCapacity" placeholder="Any" value="' + esc(s.minCapacity) + '"></label>' +
+          '<label class="field"><span>Free for</span><select class="input" name="minFree">' +
+            [['30', '30 min+'], ['60', '1 hour+'], ['120', '2 hours+'], ['180', '3 hours+'], ['240', '4 hours+']].map(function (o) {
+              return '<option value="' + o[0] + '"' + (String(s.minFree) === o[0] ? ' selected' : '') + '>' + o[1] + '</option>';
+            }).join('') + '</select></label>' +
+          '<div class="field"><span>Air-con</span><label class="switch"><input type="checkbox" name="airCon"' + (s.airCon ? ' checked' : '') + '>Needed</label></div>' +
+          '<button class="btn btn-primary" type="submit"><i class="ph-bold ph-magnifying-glass" aria-hidden="true"></i>Search</button>' +
+        '</div>' +
+        '<details class="more"' + (open ? ' open' : '') + '><summary><i class="ph-bold ph-sliders-horizontal" aria-hidden="true"></i>More options' +
+          '<span class="more-count" id="moreCount"></span><i class="ph-bold ph-caret-down caret" aria-hidden="true"></i></summary>' +
+          '<div class="more-grid">' +
+            '<div class="field time-mode"><span>Time of day</span><div class="seg" role="radiogroup" aria-label="Time of day">' +
+              [['any', 'Any time'], ['exact', 'Exact slot'], ['window', 'Between']].map(function (o) {
+                return '<label class="seg-opt"><input type="radio" name="timeMode" value="' + o[0] + '"' + (s.timeMode === o[0] ? ' checked' : '') + '><span>' + o[1] + '</span></label>';
+              }).join('') + '</div></div>' +
+            '<label class="field"><span>From</span><input class="input num" type="time" name="fromTime" step="900" min="' + hhmm(B.hours.openingMinute) + '" max="' + hhmm(B.hours.closingMinute) + '" value="' + esc(s.fromTime) + '"></label>' +
+            '<label class="field"><span>Until</span><input class="input num" type="time" name="toTime" step="900" min="' + hhmm(B.hours.openingMinute) + '" max="' + hhmm(B.hours.closingMinute) + '" value="' + esc(s.toTime) + '"></label>' +
+            '<p class="hint time-hint" id="timeHint"></p>' +
+            '<label class="field"><span>Room or building name</span><input class="input" name="text" placeholder="e.g. CTC, SEC B, 3rd floor" value="' + esc(s.text) + '" autocomplete="off"></label>' +
+            '<label class="field"><span>Equipment</span><select class="input" name="equipment">' +
+              [['', 'Any'], ['lcd', 'Projector and screen'], ['mic', 'Microphone'], ['computer', 'Computer']].map(function (o) {
+                return '<option value="' + o[0] + '"' + (s.equipment === o[0] ? ' selected' : '') + '>' + o[1] + '</option>';
+              }).join('') + '</select></label>' +
+            '<label class="field"><span>Seat limit</span><input class="input num" type="number" min="0" max="5000" inputmode="numeric" name="maxCapacity" placeholder="No limit" value="' + esc(s.maxCapacity) + '"></label>' +
+            (single ? '' : '<label class="field"><span>Days</span><select class="input" name="days">' +
+              [['all', 'Every day'], ['monsat', 'Monday to Saturday'], ['weekdays', 'Weekdays only']].map(function (o) {
+                return '<option value="' + o[0] + '"' + (s.days === o[0] ? ' selected' : '') + '>' + o[1] + '</option>';
+              }).join('') + '</select></label>') +
+            '<div class="field"><span>&nbsp;</span><button class="link-btn" type="button" id="resetMore">Clear these options</button></div>' +
+          '</div>' +
+        '</details>' +
+        '<p class="error-text" id="findError" hidden></p>' +
+      '</form>' +
+      (single ? '<p class="muted small" style="margin-top:12px">Free searches cover one day. <a href="#/access" data-nav>Pro</a> searches up to 14 days at once.</p>' : '') +
+      '<div id="findResults"></div>' +
+    '</div></div>';
+
+    var form = $('#findForm');
+    form.addEventListener('submit', function (e) { e.preventDefault(); runFind(); });
+    $all('input[name=timeMode]', form).forEach(function (r) { r.addEventListener('change', syncTimeMode); });
+    ['fromTime', 'toTime', 'text', 'maxCapacity', 'equipment'].forEach(function (n) { form[n].addEventListener('input', syncTimeMode); });
+    if (form.days) form.days.addEventListener('change', syncTimeMode);
+    $('#resetMore').addEventListener('click', function () {
+      form.querySelector('input[name=timeMode][value=any]').checked = true;
+      form.text.value = ''; form.equipment.value = ''; form.maxCapacity.value = '';
+      if (form.days) form.days.value = 'all';
+      syncTimeMode();
+    });
+    syncTimeMode();
+    var box = $('#findResults');
+    if (s.result) showFindResults(s.result);
+    else if (B.prefetch && B.prefetch.fn === 'apiAvailability') runFind();
+    else if (PRO) runFind();
+    else box.innerHTML = '<div class="panel" style="margin-top:24px">' + emptyState(ART.empty, 'Pick a day and search',
+      left('search') ? 'You have ' + plural(left('search'), 'free search') + ' left today. Results list every room with free time, earliest first.'
+        : 'You\'ve used today\'s free searches. They reset at midnight.') + '</div>';
+  }
+  function syncTimeMode() {
+    var f = $('#findForm');
+    if (!f) return;
+    var mode = (f.querySelector('input[name=timeMode]:checked') || {}).value || 'any';
+    var on = mode !== 'any';
+    f.fromTime.disabled = !on; f.toTime.disabled = !on;
+    f.minFree.disabled = mode === 'exact';
+    if (on && !f.fromTime.value) f.fromTime.value = '13:00';
+    if (on && !f.toTime.value) f.toTime.value = '15:00';
+    var from = toMinutes(f.fromTime.value), to = toMinutes(f.toTime.value);
+    $('#timeHint').textContent = mode === 'exact' ? 'Only rooms that are free for the whole slot' + (from !== null && to !== null && to > from ? ', ' + clock(from) + ' to ' + clock(to) : '') + '.'
+      : mode === 'window' ? 'Free time inside these hours that lasts at least the "Free for" length.'
+      : 'Any free time during operating hours.';
+    var count = (on ? 1 : 0) + (f.text.value.trim() ? 1 : 0) + (f.equipment.value ? 1 : 0) + (f.maxCapacity.value ? 1 : 0) + (f.days && f.days.value !== 'all' ? 1 : 0);
+    $('#moreCount').textContent = count ? String(count) : '';
+  }
+  function findQuery() {
+    var f = $('#findForm'), s = state.find;
+    s.startDate = f.startDate.value || B.today;
+    s.endDate = f.endDate && f.endDate.value >= s.startDate ? f.endDate.value : s.startDate;
+    s.type = f.type.value; s.building = f.building.value; s.minCapacity = f.minCapacity.value;
+    s.airCon = f.airCon.checked; s.minFree = f.minFree.value;
+    s.timeMode = (f.querySelector('input[name=timeMode]:checked') || {}).value || 'any';
+    s.fromTime = f.fromTime.value; s.toTime = f.toTime.value;
+    s.text = f.text.value.trim(); s.equipment = f.equipment.value; s.maxCapacity = f.maxCapacity.value;
+    s.days = f.days ? f.days.value : 'all';
+    return { startDate: s.startDate, endDate: s.endDate, type: s.type, building: s.building,
+      minCapacity: Number(s.minCapacity) || 0, maxCapacity: Number(s.maxCapacity) || 0, airCon: s.airCon, minFree: Number(s.minFree) || 0,
+      timeMode: s.timeMode, fromTime: s.fromTime, toTime: s.toTime, text: s.text, equipment: s.equipment, days: s.days };
+  }
+  function findProblem(q) {
+    if (q.startDate < B.today) return 'Pick today or a later day.';
+    if (datesBetween(q.startDate, q.endDate).length > B.maximumDays) return 'Search ' + B.maximumDays + ' days or fewer at a time.';
+    if (q.minCapacity && q.maxCapacity && q.maxCapacity < q.minCapacity) return 'The seat limit is smaller than the number of people.';
+    if (q.timeMode !== 'any') {
+      var from = toMinutes(q.fromTime), to = toMinutes(q.toTime);
+      if (from === null || to === null) return 'Pick both a start and an end time.';
+      if (to <= from) return 'The end time must be later than the start time.';
+      if (from < B.hours.openingMinute || to > B.hours.closingMinute) return 'Pick times between ' + clock(B.hours.openingMinute) + ' and ' + clock(B.hours.closingMinute) + '.';
+      if (q.timeMode === 'window' && to - from < Math.max(30, q.minFree)) return 'That window is shorter than the "Free for" length.';
+      if (q.startDate === q.endDate && q.startDate === B.today && to <= B.nowMinute) return 'That time has already passed today.';
+    }
+    return '';
+  }
+  function runFind() {
+    var query = findQuery();
+    var err = $('#findError'), problem = findProblem(query);
+    if (problem) {
+      err.textContent = problem; err.hidden = false;
+      agi.react('invalid', problem);
+      return;
+    }
+    err.hidden = true;
+    var box = $('#findResults');
+    var count = VENUES.filter(function (v) { return !query.type || v.type === query.type; }).length;
+    box.innerHTML = '<div class="panel" style="margin-top:24px">' + loader('Checking ' + plural(count, 'calendar') + '…', true) + '</div>';
+    agi.react('loading', 'Checking ' + plural(count, 'calendar') + '…');
+    var btn = $('#findForm button[type=submit]');
+    btn.disabled = true;
+    api('apiAvailability', [query]).then(function (result) {
+      noteUsage(result.usage);
+      result.query = query;
+      state.find.result = result;
+      if (box.isConnected) showFindResults(result, true);
+    }).catch(function (error) {
+      if (box.isConnected) box.innerHTML = '<div class="panel" style="margin-top:24px">' +
+        failureBlock(error, reloadUrl('apiAvailability', [query], 'find', stripResult(state.find))) + '</div>';
+    }).then(function () { btn.disabled = false; });
+  }
+  function stripResult(s) { var c = Object.assign({}, s); delete c.result; return c; }
+  function showFindResults(result, fresh) {
+    var box = $('#findResults');
+    var q = result.query || state.find;
+    var time = result.time || { mode: 'any' };
+    var minLength = time.mode === 'exact' ? 0 : Math.max(30, Number(q.minFree) || 0);
+    // Time today that has already passed is not bookable.
+    var soonest = Math.ceil((B.nowMinute + 5) / 15) * 15;
+    var slots = result.slots.map(function (slot) {
+      if (slot.date !== B.today || slot.start >= soonest) return slot;
+      if (time.mode === 'exact') return time.from >= soonest ? slot : null;
+      return Object.assign({}, slot, { start: soonest });
+    }).filter(function (slot) { return slot && slot.end - slot.start >= minLength; });
+    var byDay = {}, venueSet = {};
+    slots.forEach(function (slot) {
+      byDay[slot.date] = byDay[slot.date] || {};
+      (byDay[slot.date][slot.venue] = byDay[slot.date][slot.venue] || []).push(slot);
+      venueSet[slot.venue] = 1;
+    });
+    var notes = [];
+    if (result.failed.length) notes.push(plural(result.failed.length, 'calendar') + ' could not be read');
+    if (result.skippedNoSpecs) notes.push(result.skippedNoSpecs + ' skipped because their size, equipment or air-con isn\'t on file');
+    var timeText = time.mode === 'exact' ? 'free ' + clock(time.from) + ' to ' + clock(time.to)
+      : time.mode === 'window' ? 'between ' + clock(time.from) + ' and ' + clock(time.to) : '';
+    if (!slots.length) {
+      if (fresh) agi.react('empty');
+      box.innerHTML = '<div class="panel" style="margin-top:24px">' + emptyState(ART.empty, 'No free time matches',
+        (time.mode === 'exact' ? 'No room is open for that whole slot. Try "Between" to see partly free rooms, or move the times.'
+          : 'Try another day, a different building, or a shorter free time.') +
+        (notes.length ? ' ' + notes.join('. ') + '.' : '')) + '</div>';
+      return;
+    }
+    if (fresh) agi.react('success', 'Found ' + plural(slots.length, 'free slot') + '!');
+    var sort = state.find.sort || 'earliest';
+    box.innerHTML = '<div class="results-head"><div><h2>' + plural(slots.length, 'free slot') + ' in ' + plural(Object.keys(venueSet).length, 'room') + '</h2>' +
+        (timeText || notes.length ? '<p class="muted small">' + esc([timeText ? 'Showing rooms ' + timeText : ''].concat(notes).filter(Boolean).join('. ')) + '.</p>' : '') + '</div>' +
+        '<label class="sort"><span class="muted small">Sort</span><select class="input input-sm" id="findSort">' +
+          [['earliest', 'Earliest first'], ['longest', 'Longest free time'], ['name', 'Room name']].map(function (o) {
+            return '<option value="' + o[0] + '"' + (sort === o[0] ? ' selected' : '') + '>' + o[1] + '</option>';
+          }).join('') + '</select></label></div>' +
+      Object.keys(byDay).sort().map(function (day) {
+        var longest = function (name) { return Math.max.apply(null, byDay[day][name].map(function (s) { return s.end - s.start; })); };
+        var names = Object.keys(byDay[day]).sort(function (a, b) {
+          if (sort === 'longest') return longest(b) - longest(a) || a.localeCompare(b, undefined, { numeric: true });
+          if (sort === 'name') return a.localeCompare(b, undefined, { numeric: true });
+          return byDay[day][a][0].start - byDay[day][b][0].start || a.localeCompare(b, undefined, { numeric: true });
+        });
+        return '<div class="day-group"><div class="day-title">' + esc(dayLabel(day)) + '<span class="muted small"> · ' + plural(names.length, 'room') + '</span></div><div class="panel stagger">' +
+          names.map(function (name, i) {
+            var v = venueByKey[key(name)] || { name: name };
+            return '<div class="venue-row" style="--i:' + i + '"><div><h3>' + esc(name) + '</h3>' +
+              '<div class="meta">' + (v.building ? '<span>' + esc(v.building) + '</span>' : '') + venueFacts(v) + '</div></div>' +
+              '<div class="slot-list">' + byDay[day][name].map(function (s) {
+                return '<button class="chip chip-slot" data-venue="' + esc(name) + '" data-date="' + day + '" data-start="' + s.start + '" data-end="' + s.end +
+                  '" title="Free for ' + duration(s.end - s.start) + '. Click to book.">' + clock(s.start) + ' - ' + clock(s.end) +
+                  (s.end - s.start >= 60 ? '<span class="chip-len">' + duration(s.end - s.start) + '</span>' : '') + '</button>';
+              }).join('') + '</div></div>';
+          }).join('') + '</div></div>';
+      }).join('');
+    $('#findSort').addEventListener('change', function () { state.find.sort = this.value; showFindResults(result); });
+    $all('.chip-slot', box).forEach(function (chip) { chip.addEventListener('click', function () { bookFromSlot(chip, time); }); });
+  }
+  function bookFromSlot(el, time) {
+    var start = Number(el.getAttribute('data-start')), end = Number(el.getAttribute('data-end'));
+    var from = start, to = Math.min(end, start + 120);
+    // An exact-slot search books the slot that was asked for.
+    if (time && time.mode === 'exact' && time.from >= start && time.to <= end) { from = time.from; to = time.to; }
+    go('book', { venue: el.getAttribute('data-venue'), date: el.getAttribute('data-date'), startTime: hhmm(from), endTime: hhmm(to) });
+  }
+
+  // ---------- schedule ----------
+  function renderSchedule() {
+    var s = state.schedule, single = B.maximumDays <= 1;
+    if (single) s.endDate = s.startDate;
+    main.innerHTML = '<div class="page"><div class="wrap">' +
+      '<div class="page-head"><div><h1>Venue schedule</h1><p>One room\'s bookings, with the free time between them.</p></div>' +
+        (PRO ? '' : meter('schedule')) + '</div>' +
+      '<form class="panel filters" id="schedForm" style="grid-template-columns:' + (single ? '2fr 1fr auto' : '2fr 1fr 1fr auto') + '">' +
+        '<label class="field"><span>Venue</span><input class="input" name="venue" list="venueNames" placeholder="Type a room, like CTC 205" value="' + esc(s.venue) + '" autocomplete="off"></label>' +
+        '<label class="field"><span>' + (single ? 'Day' : 'From') + '</span><input class="input" type="date" name="startDate" value="' + s.startDate + '"></label>' +
+        (single ? '' : '<label class="field"><span>To</span><input class="input" type="date" name="endDate" value="' + s.endDate + '"></label>') +
+        '<button class="btn btn-primary" type="submit">Show schedule</button>' +
+      '</form>' + venueDatalist() +
+      '<div id="schedResults" style="margin-top:24px"></div>' +
+    '</div></div>';
+    $('#schedForm').addEventListener('submit', function (e) { e.preventDefault(); runSchedule(); });
+    if (s.result && s.result.days && key(s.result.venue) === key(s.venue) && s.result.startDate === s.startDate && s.result.endDate === s.endDate) showSchedule(s.result);
+    else if (s.venue && (PRO || (B.prefetch && B.prefetch.fn === 'apiReservations'))) runSchedule();
+    else $('#schedResults').innerHTML = '<div class="panel">' + emptyState(ART.empty, s.venue ? 'Ready when you are' : 'Pick a room',
+      s.venue ? 'Press Show schedule to load ' + s.venue + '.' : 'Start typing a room name. You can also open a schedule from the Venues page.') + '</div>';
+  }
+  function runSchedule() {
+    var f = $('#schedForm'), s = state.schedule;
+    var v = venueByKey[key(f.venue.value)];
+    if (!v) { toast('Pick a room from the list.'); agi.react('locked', 'I don\'t know that room. Pick one from the list?'); return; }
+    s.venue = v.name;
+    s.startDate = f.startDate.value || B.today;
+    s.endDate = f.endDate && f.endDate.value >= s.startDate ? f.endDate.value : s.startDate;
+    if (datesBetween(s.startDate, s.endDate).length > B.maximumDays) { toast('Show ' + B.maximumDays + ' days or fewer at a time.'); return; }
+    var query = { venue: s.venue, startDate: s.startDate, endDate: s.endDate };
+    var box = $('#schedResults');
+    box.innerHTML = '<div class="panel">' + loader('Opening ' + s.venue + '\'s calendar…', true) + '</div>';
+    agi.react('loading', 'Opening ' + s.venue + '\'s calendar…');
+    api('apiReservations', [query]).then(function (result) {
+      noteUsage(result.usage);
+      result.startDate = result.startDate || s.startDate; result.endDate = result.endDate || s.endDate;
+      s.result = result;
+      if (box.isConnected) {
+        var count = showSchedule(result);
+        agi.react(count ? 'success' : 'free', count ? 'Here you go. Free gaps are in blue.' : 'No bookings at all. Wide open!');
+      }
+    }).catch(function (error) {
+      if (box.isConnected) box.innerHTML = '<div class="panel">' + failureBlock(error, reloadUrl('apiReservations', [query], 'schedule', stripResult(s))) + '</div>';
+    });
+  }
+  function showSchedule(result) {
+    var v = venueByKey[key(result.venue)] || { name: result.venue };
+    var start = result.startDate || state.schedule.startDate;
+    var open = B.hours.openingMinute, close = B.hours.closingMinute;
+    var total = 0;
+    var agenda = (result.days || []).map(function (day) {
+      var items = day.items.slice().sort(function (a, b) { return (b.allDay - a.allDay) || a.start - b.start || a.end - b.end; });
+      total += items.length;
+      var blocked = items.some(function (e) { return e.allDay; });
+      var rows = [];
+      // Free gaps: walk the bookings in order and only count time inside operating hours.
+      var cursor = open;
+      if (day.date === B.today) cursor = Math.max(cursor, Math.ceil((B.nowMinute + 5) / 15) * 15);
+      if (day.date < B.today) cursor = close;
+      var pastClose = day.date < B.today || cursor >= close;
+      items.forEach(function (e) {
+        if (!e.allDay && !blocked) {
+          var gapEnd = Math.min(e.start, close);
+          if (gapEnd - cursor >= 30) rows.push(freeRow(day.date, cursor, gapEnd));
+          cursor = Math.max(cursor, Math.min(e.end, 1440));
+        }
+        rows.push(agendaRow(eventTime(e), e));
+      });
+      if (!blocked && close - cursor >= 30) rows.push(freeRow(day.date, cursor, close));
+      var summary = blocked ? 'Booked all day' : !items.length ? (pastClose ? 'Closed for today' : 'No bookings') : plural(items.length, 'booking');
+      return '<div class="day-group"><div class="day-title">' + esc(dayLabel(day.date)) + '<span class="muted small"> · ' + esc(summary) + '</span></div><div class="panel">' +
+        (rows.join('') || '<div class="agenda-item"><span class="muted">' + (pastClose ? 'Operating hours are over for today.' : 'Nothing to show.') + '</span></div>') + '</div></div>';
+    }).join('');
+    $('#schedResults').innerHTML = '<div class="schedule-grid">' +
+      '<aside class="panel spec-card"><h2>' + esc(v.name) + '</h2><p class="muted">' + esc(v.type || '') + '</p>' + specList(v) +
+        '<button class="btn btn-primary" id="bookThis" style="width:100%">Book this room</button></aside>' +
+      '<div>' + (agenda || '<div class="panel">' + emptyState(ART.empty, 'Nothing to show', 'Pick a day and press Show schedule.') + '</div>') + '</div></div>';
+    $('#bookThis').addEventListener('click', function () { go('book', { venue: v.name, date: start >= B.today ? start : B.today }); });
+    $all('[data-free]', $('#schedResults')).forEach(function (b) { b.addEventListener('click', function () { bookFromSlot(b); }); });
+    return total;
+  }
+  // "9:00 AM - 5:00 PM", "Until 2:00 AM", "From 10:00 PM", or "All day".
+  function eventTime(e) {
+    if (e.allDay) return e.startsEarlier || e.endsLater ? 'All day (multi-day)' : 'All day';
+    var end = e.end >= 1440 ? 'midnight' : clock(e.end);
+    if (e.startsEarlier && e.endsLater) return 'All day (multi-day)';
+    if (e.startsEarlier) return 'Until ' + end + ' (from the day before)';
+    if (e.endsLater) return 'From ' + clock(e.start) + ', runs past midnight';
+    return clock(e.start) + ' - ' + end;
+  }
+  function agendaRow(time, e) {
+    return '<div class="agenda-item"><div class="agenda-time">' + esc(time) + '</div><div><strong>' + esc(e.title) + '</strong>' +
+      (e.description && e.description !== 'No description available' ? '<div class="agenda-desc">' + esc(e.description) + '</div>' : '') + '</div></div>';
+  }
+  function freeRow(day, from, to) {
+    return '<div class="agenda-item agenda-free"><div class="agenda-time">' + clock(from) + ' - ' + clock(to) + '</div>' +
+      '<div style="display:flex;justify-content:space-between;align-items:center;gap:12px"><strong>Free for ' + duration(to - from) + '</strong>' +
+      '<button class="btn btn-sm" data-free data-venue="' + esc(state.schedule.venue) + '" data-date="' + day + '" data-start="' + from + '" data-end="' + to + '">Book</button></div></div>';
+  }
+  function specList(v) {
+    if (!v.hasSpecs) return '<dl class="spec-list">' + (v.building ? '<dt>Building</dt><dd>' + esc(v.building) + '</dd>' : '') + '</dl>' +
+      '<p class="muted small" style="margin-bottom:16px">Size, equipment and air-con are not on file for this room.</p>';
+    var rows = [['Building', v.building + (v.floor ? ', ' + v.floor : '')], ['Facility', v.facility],
+      ['Capacity', v.capacity ? v.capacity + (v.capacityNote ? ' (' + v.capacityNote + ')' : '') : 'Not listed'],
+      ['Air-con', v.airCon || 'Not listed'], ['Equipment', v.equipment]];
+    return '<dl class="spec-list">' + rows.filter(function (r) { return r[1]; }).map(function (r) {
+      return '<dt>' + r[0] + '</dt><dd>' + esc(r[1]) + '</dd>';
+    }).join('') + '</dl>';
+  }
+
+  // ---------- venues ----------
+  function renderVenues() {
+    var s = state.venues, counts = {};
+    VENUES.forEach(function (v) { counts[v.type] = (counts[v.type] || 0) + 1; });
+    main.innerHTML = '<div class="page"><div class="wrap">' +
+      '<div class="page-head"><div><h1>Venues</h1><p>Every room on the CFMO reservation portal, with size and equipment where they are on file.</p></div></div>' +
+      '<div class="panel venue-tools">' +
+        '<label class="field"><span>Search</span><input class="input" id="vq" type="search" placeholder="Room, building or equipment" value="' + esc(s.q) + '"></label>' +
+        '<label class="field"><span>Building</span><select class="input" id="vb">' + buildingOptions(s.building) + '</select></label>' +
+        '<label class="field"><span>People</span><input class="input num" id="vc" type="number" min="0" placeholder="Any" value="' + esc(s.minCapacity) + '"></label>' +
+        '<div class="field"><span>Air-con</span><label class="switch"><input type="checkbox" id="va"' + (s.airCon ? ' checked' : '') + '>Needed</label></div>' +
+      '</div>' +
+      '<div class="type-pills" role="group" aria-label="Venue type">' +
+        '<button class="chip" data-type="" aria-pressed="' + (!s.type) + '">All <span class="num">' + VENUES.length + '</span></button>' +
+        B.types.map(function (t) {
+          return '<button class="chip" data-type="' + esc(t) + '" aria-pressed="' + (s.type === t) + '">' + esc(t) + ' <span class="num">' + counts[t] + '</span></button>';
+        }).join('') +
+      '</div>' +
+      '<p class="muted small" id="venueCount" style="margin-top:12px"></p>' +
+      '<div class="venue-grid" id="venueGrid"></div>' +
+    '</div></div>';
+    var update = debounce(drawVenues, 60);
+    $('#vq').addEventListener('input', function (e) { s.q = e.target.value; update(); });
+    $('#vb').addEventListener('change', function (e) { s.building = e.target.value; drawVenues(); });
+    $('#vc').addEventListener('input', function (e) { s.minCapacity = e.target.value; update(); });
+    $('#va').addEventListener('change', function (e) { s.airCon = e.target.checked; drawVenues(); });
+    $all('.type-pills .chip').forEach(function (chip) {
+      chip.addEventListener('click', function () {
+        s.type = chip.getAttribute('data-type');
+        $all('.type-pills .chip').forEach(function (c) { c.setAttribute('aria-pressed', String(c === chip)); });
+        drawVenues();
+      });
+    });
+    drawVenues();
+  }
+  function drawVenues() {
+    var s = state.venues, q = key(s.q), minCap = Number(s.minCapacity) || 0;
+    var list = VENUES.filter(function (v) {
+      if (s.type && v.type !== s.type) return false;
+      if (s.building && v.building !== s.building) return false;
+      if (s.airCon && v.airCon !== 'Yes') return false;
+      if (minCap && !(v.capacity >= minCap)) return false;
+      if (q && key([v.name, v.building, v.equipment, v.facility, v.type].join(' ')).indexOf(q) === -1) return false;
+      return true;
+    });
+    $('#venueCount').textContent = plural(list.length, 'room');
+    var grid = $('#venueGrid');
+    if (!list.length) {
+      grid.innerHTML = '<div class="panel" style="grid-column:1/-1">' + emptyState(ART.empty, 'No rooms match', 'Clear a filter or search for something broader.') + '</div>';
+      return;
+    }
+    grid.innerHTML = list.map(function (v) {
+      return '<article class="panel-flat venue-card"><div><h3>' + esc(v.name) + '</h3><p class="muted small">' +
+        esc([v.building, v.floor].filter(Boolean).join(', ') || v.type) + '</p></div>' +
+        '<div class="meta"><span class="badge">' + esc(v.facility || v.type) + '</span>' + venueFacts(v) + '</div>' +
+        (v.equipment && v.equipment !== 'None listed' ? '<p class="small muted">' + esc(v.equipment) + '</p>' : '') +
+        (!v.hasSpecs ? '<p class="small muted">Specs not on file</p>' : '') +
+        '<div class="actions"><button class="btn btn-sm" data-act="schedule" data-venue="' + esc(v.name) + '">Schedule</button>' +
+        '<button class="btn btn-sm btn-primary" data-act="book" data-venue="' + esc(v.name) + '">Book</button></div></article>';
+    }).join('');
+    $all('[data-act]', grid).forEach(function (b) {
+      b.addEventListener('click', function () {
+        var name = b.getAttribute('data-venue');
+        if (b.getAttribute('data-act') === 'schedule') go('schedule', { venue: name, result: null });
+        else go('book', { venue: name });
+      });
+    });
+  }
+
+  // ---------- book ----------
+  var LOCAL_KEY = PRO && ACCOUNT.email ? 'heVenueProfiles:' + ACCOUNT.email : '';
+  try { localStorage.removeItem('heVenueRequester'); } catch (e) {}
+  var profiles = mergeStores(B.profiles || {}, readLocalProfiles());
+  var currentProfileId = profiles.lastUsedId || (profiles.profiles[0] && profiles.profiles[0].id) || '';
+  var dayCache = {};
+  var F = window.RF ? window.RF.init(B.form) : null;
+  var CH = B.form.choices || {};
+  var LABELS = { organization: 'Organization', contactPerson: 'Point person', localNo: 'Local no.', contactNumber: 'Mobile no.',
+    email: 'Email', approvedBy: 'Approved by', approverName: 'Name of approver', eventTitle: 'Title of event',
+    nature: 'Nature of event', conditions: 'Check all that apply (8.a)', activityDetails: 'Activity description (8.b)',
+    date: 'Date', startTime: 'Start time', endTime: 'End time', venue: 'Venue', participants: 'Number of participants',
+    equipment: 'AV equipment', proofLink: 'Proof of approval link' };
+
+  function readLocalProfiles() {
+    if (!LOCAL_KEY) return { lastUsedId: '', profiles: [] };
+    try { return JSON.parse(storageGet(LOCAL_KEY)) || { lastUsedId: '', profiles: [] }; } catch (e) { return { lastUsedId: '', profiles: [] }; }
+  }
+  function mergeStores(a, b) {
+    var byId = {}, deleted = {};
+    (a.deleted || []).concat(b.deleted || []).forEach(function (id) { deleted[id] = true; });
+    (a.profiles || []).concat(b.profiles || []).forEach(function (p) {
+      if (!byId[p.id] || (p.updatedAt || 0) > (byId[p.id].updatedAt || 0)) byId[p.id] = p;
+    });
+    var list = Object.keys(byId).map(function (id) { return byId[id]; }).filter(function (p) { return !deleted[p.id]; })
+      .sort(function (x, y) { return x.name.localeCompare(y.name); });
+    var last = b.lastUsedId && byId[b.lastUsedId] && !deleted[b.lastUsedId] ? b.lastUsedId : a.lastUsedId;
+    return { lastUsedId: last || '', profiles: list, deleted: Object.keys(deleted) };
+  }
+  function persistProfiles() {
+    if (LOCAL_KEY) storageSet(LOCAL_KEY, JSON.stringify(profiles));
+    api('apiSaveProfiles', [profiles]).catch(function () {});
+  }
+  function findProfile(id) { return profiles.profiles.filter(function (p) { return p.id === id; })[0] || null; }
+
+  // A list answer (equipment, approved by) as checked options plus the "Other" text.
+  function splitOther(field, list) {
+    var known = [], other = [];
+    (list || []).forEach(function (x) { (CH[field].indexOf(x) !== -1 || (field === 'equipment' && x === B.form.noEquipment) ? known : other).push(x); });
+    return { known: known, other: other.join(', ') };
+  }
+  function checkGroup(field, options, selected, extraOption) {
+    var all = options.concat(extraOption ? [extraOption] : []);
+    return '<div class="checks checks-col">' + all.map(function (o) {
+      var hint = F ? F.hint(field, o) : '';
+      return '<label class="check-chip"><input type="checkbox" name="' + field + '" value="' + esc(o) + '"' + (selected.indexOf(o) !== -1 ? ' checked' : '') + '>' +
+        '<span>' + esc(F ? F.label(field, o) : o) + (hint ? '<small class="muted"> ' + esc(hint) + '</small>' : '') + '</span></label>';
+    }).join('') + '</div>';
+  }
+  function fieldBox(name, label, inner, cls, hint) {
+    return '<div class="field' + (cls ? ' ' + cls : '') + '" data-field="' + name + '"><span>' + label + '</span>' + inner +
+      (hint ? '<small class="hint">' + hint + '</small>' : '') + '</div>';
+  }
+
+  function renderBook() {
+    var s = state.book;
+    var natureIsOther = s.nature && CH.nature.indexOf(s.nature) === -1;
+    var eq = splitOther('equipment', s.equipment);
+    main.innerHTML = '<div class="page"><div class="wrap">' +
+      '<div class="page-head"><div><h1>Book a room</h1><p>Check the time is free, then ' +
+        (PRO ? 'open the CFMO request form with every answer filled in.' : 'send your request on the CFMO form.') + '</p></div>' +
+        (PRO ? '' : meter('check')) + '</div>' +
+      '<form class="book-grid" id="bookForm" novalidate autocomplete="off">' +
+        '<div class="panel form-panel">' +
+          '<section class="form-section"><h2>When and where</h2><div class="form-grid">' +
+            fieldBox('venue', 'Facility requested', '<input class="input" name="venue" list="venueNames" placeholder="e.g. CTC 205" value="' + esc(s.venue) + '">', 'wide') +
+            fieldBox('date', 'Date of event', '<input class="input" type="date" name="date" min="' + B.today + '" value="' + esc(s.date) + '">') +
+            fieldBox('participants', 'Number of participants', '<input class="input num" type="number" min="1" inputmode="numeric" name="participants" value="' + esc(s.participants) + '">') +
+            fieldBox('startTime', 'Start time', '<input class="input num" type="time" name="startTime" value="' + esc(s.startTime) + '">') +
+            fieldBox('endTime', 'End time', '<input class="input num" type="time" name="endTime" value="' + esc(s.endTime) + '">') +
+          '</div></section>' +
+          '<section class="form-section"><h2>About the event</h2><div class="form-grid">' +
+            fieldBox('eventTitle', 'Title of event or activity', '<input class="input" name="eventTitle" maxlength="200" placeholder="e.g. MEA General Assembly" value="' + esc(s.eventTitle) + '">', 'wide') +
+            fieldBox('nature', 'Nature of event', '<select class="input" name="nature">' +
+              CH.nature.map(function (o) { return '<option' + (s.nature === o ? ' selected' : '') + '>' + esc(o) + '</option>'; }).join('') +
+              '<option value="__other"' + (natureIsOther ? ' selected' : '') + '>Other…</option></select>' +
+              '<input class="input" name="natureOther" maxlength="120" placeholder="Type the nature of the event" value="' + esc(natureIsOther ? s.nature : '') + '"' + (natureIsOther ? '' : ' hidden') + '>', 'wide') +
+            fieldBox('conditions', 'Check all that apply', checkGroup('conditions', CH.conditions, s.conditions), 'wide') +
+            fieldBox('activityDetails', 'Group dynamics or interactive activities', '<textarea class="input" name="activityDetails" maxlength="1000" rows="2" placeholder="Describe them, or write N/A">' + esc(s.activityDetails) + '</textarea>', 'wide', 'Write N/A if there are none.') +
+            fieldBox('equipment', 'AV equipment needs', checkGroup('equipment', CH.equipment, eq.known, B.form.noEquipment) +
+              '<input class="input" name="equipmentOther" maxlength="120" placeholder="Other equipment, e.g. Microphone" value="' + esc(eq.other) + '">', 'wide', 'The form needs an answer here. Pick "None" if you need nothing.') +
+            fieldBox('proofLink', 'Proof of approval (Drive link)', '<input class="input" type="url" name="proofLink" placeholder="https://drive.google.com/…" value="' + esc(s.proofLink) + '">', 'wide',
+              'Upload a screenshot of the approval to Google Drive, share it so CFMO can open it, then paste the link.') +
+          '</div></section>' +
+          (PRO ? '<section class="form-section"><h2>Requesting for</h2>' +
+            '<div class="profile-bar"><label class="field"><span>Profile</span><select class="input" id="profileSelect"></select></label>' +
+            '<button type="button" class="btn" id="newProfile"><i class="ph-bold ph-plus" aria-hidden="true"></i>New</button>' +
+            '<button type="button" class="link-btn" id="deleteProfile">Delete</button></div>' +
+            '<p class="muted small" id="profileNote" style="margin-top:8px"></p>' +
+            '<details class="requester" id="requesterBox" style="margin-top:14px"><summary><span id="requesterSummary">Requester details</span><i class="ph-bold ph-caret-down" aria-hidden="true"></i></summary>' +
+              '<div class="form-grid"><label class="field wide"><span>Profile name</span><input class="input" id="profileName" placeholder="e.g. Ateneo MEA"></label>' +
+              fieldBox('organization', 'Sponsoring office, department or organization', '<input class="input" name="organization">', 'wide') +
+              fieldBox('contactPerson', 'Point person', '<input class="input" name="contactPerson" placeholder="Last Name, First Name">') +
+              fieldBox('localNo', 'Local no. <span class="muted">(optional)</span>', '<input class="input" name="localNo" inputmode="numeric" maxlength="15" placeholder="Leave blank if none">') +
+              fieldBox('contactNumber', 'Mobile no.', '<input class="input" type="tel" name="contactNumber" inputmode="tel" maxlength="16" placeholder="9171234567">') +
+              fieldBox('email', 'Email address', '<input class="input" type="email" name="email">', '', 'Official Ateneo email: @obf.ateneo.edu for students, @ateneo.edu for employees.') +
+              fieldBox('approvedBy', 'Activity approved by', checkGroup('approvedBy', CH.approvedBy, []) +
+                '<input class="input" name="approvedByOther" maxlength="120" placeholder="Other, e.g. Org Moderator">', 'wide') +
+              fieldBox('approverName', 'Name of approver', '<input class="input" name="approverName" placeholder="e.g. Dela Cruz, Juan">', 'wide') +
+              '</div></details></section>'
+            : '<section class="locked"><h3><i class="ph-bold ph-lock-simple" aria-hidden="true"></i>Saved profiles and autofill are Pro</h3>' +
+              '<p class="muted">Pro remembers your org details and opens the CFMO request form already filled in.</p>' +
+              '<div><a class="btn btn-sm btn-lemon" href="#/access" data-nav>See plans</a></div></section>') +
+        '</div>' +
+        '<aside class="panel summary-card">' +
+          '<div id="venueMini"></div>' +
+          '<div class="status" id="status"></div>' +
+          '<div class="form-state" id="formState" hidden></div>' +
+          '<div class="intake" id="intake"></div>' +
+          '<p class="error-text" id="formError" hidden></p>' +
+          (PRO ? '<button class="btn btn-primary" type="submit" id="generate">Fill the request form</button>'
+            : '<a class="btn btn-lemon" href="#/access" data-nav><i class="ph-bold ph-lock-simple" aria-hidden="true"></i>Unlock autofill</a>' +
+              '<a class="btn" href="' + esc(B.links.forms) + '" target="_blank" rel="noopener">Open the CFMO forms page</a>') +
+          '<div class="link-box" id="linkBox" hidden>' +
+            '<a class="btn btn-primary" id="openForm" target="_blank" rel="noopener"><i class="ph-bold ph-arrow-square-out" aria-hidden="true"></i>Open the filled form</a>' +
+            '<textarea id="linkText" readonly aria-label="Prefilled request link"></textarea>' +
+            '<button class="btn btn-sm" type="button" id="copyLink"><i class="ph-bold ph-copy" aria-hidden="true"></i>Copy link</button>' +
+            '<ul class="link-notes"><li>Check every answer, then answer the <strong>Conforme</strong> question at the end yourself. Submitting is what books the room.</li>' +
+            '<li>If the form shows old answers instead of these, Google restored a saved draft. Click <strong>Clear form</strong> at the bottom of the form, then open this link again.</li>' +
+            '<li>Form says it\'s no longer accepting responses? <button type="button" class="link-btn" data-report="closed">Tell everyone it\'s closed</button></li></ul>' +
+          '</div>' +
+        '</aside>' +
+      '</form>' + venueDatalist() +
+    '</div></div>';
+
+    var form = $('#bookForm');
+    if (PRO) {
+      fillRequester(findProfile(currentProfileId));
+      drawProfiles();
+      $('#profileSelect').addEventListener('change', function () { currentProfileId = this.value; fillRequester(findProfile(currentProfileId)); drawProfiles(); });
+      $('#newProfile').addEventListener('click', function () { currentProfileId = ''; fillRequester(null); drawProfiles(); $('#requesterBox').open = true; form.organization.focus(); });
+      var armed = false;
+      $('#deleteProfile').addEventListener('click', function () {
+        if (!currentProfileId) return;
+        if (!armed) { armed = true; this.textContent = 'Click again to delete'; return; }
+        armed = false;
+        profiles.profiles = profiles.profiles.filter(function (p) { return p.id !== currentProfileId; });
+        profiles.deleted = (profiles.deleted || []).concat([currentProfileId]);
+        if (profiles.lastUsedId === currentProfileId) profiles.lastUsedId = '';
+        persistProfiles();
+        currentProfileId = profiles.profiles[0] ? profiles.profiles[0].id : '';
+        fillRequester(findProfile(currentProfileId)); drawProfiles();
+        toast('Profile deleted.');
+      });
+      form.addEventListener('submit', function (e) { e.preventDefault(); generateLink(); });
+      $('#copyLink').addEventListener('click', function () {
+        var t = $('#linkText'); t.select();
+        var done = function () { toast('Link copied.'); agi.react('copy'); };
+        if (navigator.clipboard) navigator.clipboard.writeText(t.value).then(done, function () { document.execCommand('copy'); done(); });
+        else { document.execCommand('copy'); done(); }
+      });
+    } else {
+      form.addEventListener('submit', function (e) { e.preventDefault(); });
+    }
+    var check = debounce(checkAvailability, 600);
+    ['venue', 'date', 'startTime', 'endTime', 'participants'].forEach(function (n) {
+      form[n].addEventListener('input', function () { syncBookState(); drawVenueMini(); check(); hideLink(); if (n === 'date') drawIntake(); });
+    });
+    form.addEventListener('input', function (e) { if (['venue', 'date', 'startTime', 'endTime', 'participants'].indexOf(e.target.name) === -1) { syncBookState(); hideLink(); } });
+    form.addEventListener('change', function (e) {
+      var t = e.target;
+      if (t.name === 'nature') { form.natureOther.hidden = t.value !== '__other'; if (t.value === '__other') form.natureOther.focus(); }
+      // "None" answers can't be combined with other picks.
+      if (t.type === 'checkbox' && t.checked) {
+        var none = t.name === 'conditions' ? B.form.noneCondition : t.name === 'equipment' ? B.form.noEquipment : null;
+        if (none) $all('input[name=' + t.name + ']', form).forEach(function (b) { if (t.value === none ? b !== t : b.value === none) b.checked = false; });
+        if (t.name === 'equipment' && t.value === B.form.noEquipment) form.equipmentOther.value = '';
+      }
+      syncBookState(); hideLink();
+      if (t.type === 'checkbox' && $('#bookForm [data-field="' + t.name + '"] .field-error')) checkField(t.name);
+    });
+    ['localNo', 'contactNumber', 'email', 'contactPerson', 'approverName', 'participants', 'date', 'startTime', 'endTime', 'proofLink', 'activityDetails'].forEach(function (n) {
+      var input = form[n];
+      if (!input) return;
+      input.addEventListener('blur', function () { if (input.value.trim()) checkField(n); });
+      input.addEventListener('input', function () { if (input.getAttribute('aria-invalid') === 'true') checkField(n); });
+    });
+    $('#bookForm').addEventListener('click', function (e) {
+      var b = e.target.closest('[data-report]');
+      if (b) reportForm(b.getAttribute('data-report'), b.getAttribute('data-note') || '');
+    });
+    drawVenueMini();
+    drawIntake();
+    loadFormStatus(false);
+    checkAvailability();
+  }
+  // ---------- is the CFMO form taking responses? ----------
+  var formStatus = null, formStatusAt = 0;
+  function loadFormStatus(force) {
+    drawFormState();
+    if (!force && formStatus && Date.now() - formStatusAt < 120000) return;
+    api('apiFormStatus').then(function (st) { formStatus = st; formStatusAt = Date.now(); drawFormState(); drawIntake(); }).catch(function () {});
+  }
+  function manilaTime(ms) {
+    try { return new Date(ms).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: 'Asia/Manila' }); } catch (e) { return ''; }
+  }
+  function drawFormState() {
+    var box = $('#formState');
+    if (!box) return;
+    var st = formStatus;
+    if (!st) { box.hidden = true; return; }
+    box.hidden = false;
+    if (st.state === 'closed') {
+      box.className = 'form-state closed';
+      box.innerHTML = '<strong><i class="ph-bold ph-prohibit" aria-hidden="true"></i>The form isn\'t taking responses</strong>' +
+        '<span>' + esc(st.message || 'This form is no longer accepting responses.') + '</span>' +
+        (st.source === 'report'
+          ? '<span class="muted">Reported by a student at ' + esc(manilaTime(st.reportedAt)) + '. Shown until the next intake window at ' + esc(manilaTime(st.until)) + '.</span>' +
+            '<div class="row"><button type="button" class="btn btn-sm" data-report="open"><i class="ph-bold ph-check" aria-hidden="true"></i>It\'s open again</button></div>'
+          : '');
+    } else if (st.state === 'open') {
+      box.className = 'form-state open';
+      box.innerHTML = '<strong><i class="ph-bold ph-door-open" aria-hidden="true"></i>The form is taking responses</strong>';
+    } else {
+      box.className = 'form-state';
+      box.innerHTML = '<strong><i class="ph-bold ph-question" aria-hidden="true"></i>Is the form still open?</strong>' +
+        '<span class="muted">If it says "no longer accepting responses", tap below so others don\'t fill in a closed form.</span>' +
+        '<div class="row"><button type="button" class="btn btn-sm" data-report="closed" data-note="60 per day limit reached.">Closed: 60-a-day limit</button>' +
+        '<button type="button" class="btn btn-sm" data-report="closed">Closed: other reason</button></div>';
+    }
+  }
+  function reportForm(kind, note) {
+    api('apiReportFormState', [kind, note]).then(function (st) {
+      formStatus = st; formStatusAt = Date.now();
+      drawFormState(); drawIntake();
+      toast(kind === 'closed' ? 'Thanks. Everyone now sees the form as closed.' : 'Thanks. The closed notice is cleared.');
+      agi.react(kind === 'closed' ? 'empty' : 'free', kind === 'closed' ? 'Noted. I\'ll warn the others.' : 'Yay, it\'s open!');
+    }).catch(function (error) { toast(friendlyError(error)); agi.react('error'); });
+  }
+  // Every answer, shaped the way the server and the form expect.
+  function bookValues() {
+    var f = $('#bookForm'), s = state.book, v = {};
+    ['venue', 'date', 'startTime', 'endTime', 'participants', 'eventTitle', 'activityDetails', 'proofLink'].forEach(function (n) { v[n] = s[n] || ''; });
+    v.nature = s.nature; v.conditions = s.conditions.slice(); v.equipment = s.equipment.slice();
+    if (PRO) {
+      ['organization', 'contactPerson', 'localNo', 'contactNumber', 'email', 'approverName'].forEach(function (n) { v[n] = f[n].value.trim(); });
+      v.approvedBy = $all('input[name=approvedBy]:checked', f).map(function (b) { return b.value; });
+      if (f.approvedByOther.value.trim()) v.approvedBy.push(f.approvedByOther.value.trim());
+    }
+    return v;
+  }
+  function requestErrors(values) { return F ? F.errors(values, B.today) : {}; }
+  function checkField(name) {
+    var values = bookValues(), only = {};
+    only[name] = values[name];
+    if (name === 'startTime' || name === 'endTime') { only.startTime = values.startTime; only.endTime = values.endTime; }
+    if (name === 'activityDetails' || name === 'conditions') { only.conditions = values.conditions; only.activityDetails = values.activityDetails; }
+    var errs = requestErrors(only);
+    if (name === 'startTime' || name === 'endTime') { markField('endTime', errs.endTime || ''); markField('startTime', ''); return errs.endTime || ''; }
+    if (name === 'conditions' || name === 'activityDetails') { markField('activityDetails', errs.activityDetails || ''); markField('conditions', errs.conditions || ''); return errs[name] || ''; }
+    markField(name, errs[name] || '');
+    return errs[name] || '';
+  }
+  function markField(name, msg) {
+    var field = $('#bookForm [data-field="' + name + '"]');
+    if (!field) return;
+    var input = field.querySelector('input:not([type=checkbox]), select, textarea');
+    var note = field.querySelector('.field-error');
+    if (msg) {
+      field.classList.add('has-error');
+      if (input) input.setAttribute('aria-invalid', 'true');
+      if (!note) { note = document.createElement('small'); note.className = 'field-error'; note.id = 'err-' + name; field.appendChild(note); }
+      note.textContent = msg;
+      if (input) input.setAttribute('aria-describedby', note.id);
+    } else {
+      field.classList.remove('has-error');
+      if (input) { input.removeAttribute('aria-invalid'); input.removeAttribute('aria-describedby'); }
+      if (note) note.remove();
+    }
+  }
+  function syncBookState() {
+    var f = $('#bookForm'), s = state.book;
+    ['venue', 'date', 'startTime', 'endTime', 'participants', 'eventTitle', 'activityDetails', 'proofLink'].forEach(function (n) { s[n] = f[n].value.trim(); });
+    s.nature = f.nature.value === '__other' ? f.natureOther.value.trim() : f.nature.value;
+    s.conditions = $all('input[name=conditions]:checked', f).map(function (b) { return b.value; });
+    s.equipment = $all('input[name=equipment]:checked', f).map(function (b) { return b.value; });
+    var other = f.equipmentOther.value.trim();
+    if (other) s.equipment = s.equipment.filter(function (x) { return x !== B.form.noEquipment; }).concat([other]);
+  }
+  function drawIntake() {
+    var box = $('#intake');
+    if (!box || !F) return;
+    var status = F.intakeStatus(), late = F.leadWarning(state.book.date);
+    if (formStatus && formStatus.state === 'closed') status = { open: false, text: status.open ? '' : status.text };
+    box.className = 'intake' + (status.open ? ' open' : '') + (late ? ' late' : '');
+    box.innerHTML = (status.text ? '<p><i class="ph-bold ' + (status.open ? 'ph-door-open' : 'ph-clock') + '" aria-hidden="true"></i>' + esc(status.text) + '</p>' : '') +
+      (late ? '<p class="late-note"><i class="ph-bold ph-warning" aria-hidden="true"></i>' + esc(late) + '</p>' : '');
+  }
+  function hideLink() { var box = $('#linkBox'); if (box) box.hidden = true; }
+  function drawProfiles() {
+    var select = $('#profileSelect');
+    var options = profiles.profiles.map(function (p) {
+      return '<option value="' + esc(p.id) + '"' + (p.id === currentProfileId ? ' selected' : '') + '>' + esc(p.name) + '</option>';
+    });
+    if (!currentProfileId) options.unshift('<option value="" selected>New profile (not saved yet)</option>');
+    select.innerHTML = options.join('');
+    var del = $('#deleteProfile');
+    del.hidden = !currentProfileId;
+    del.textContent = 'Delete';
+    $('#profileNote').textContent = profiles.profiles.length
+      ? 'Profiles are private to ' + ACCOUNT.email + '. Filling the form saves changes to this profile.'
+      : 'Fill in your details once. They are saved as a profile when you fill the form.';
+  }
+  function fillRequester(profile) {
+    var f = $('#bookForm');
+    var values = Object.assign({}, B.form.requesterDefaults, profile ? profile.fields : {});
+    ['organization', 'contactPerson', 'localNo', 'contactNumber', 'email', 'approverName'].forEach(function (n) { f[n].value = values[n] || ''; });
+    var approved = splitOther('approvedBy', Array.isArray(values.approvedBy) ? values.approvedBy : []);
+    $all('input[name=approvedBy]', f).forEach(function (b) { b.checked = approved.known.indexOf(b.value) !== -1; });
+    f.approvedByOther.value = approved.other;
+    $('#profileName').value = profile ? profile.name : '';
+    var complete = B.form.requiredRequesterFields.every(function (n) { return Array.isArray(values[n]) ? values[n].length : values[n]; });
+    $('#requesterBox').open = !complete;
+    $('#requesterSummary').textContent = complete ? values.organization + ', ' + values.contactPerson : 'Requester details';
+  }
+  function saveCurrentProfile(values) {
+    var fields = {};
+    B.form.requesterFields.forEach(function (n) { fields[n] = values[n]; });
+    var person = String(fields.contactPerson || '').split(',')[0].trim();
+    var name = $('#profileName').value.trim() || [fields.organization, person].filter(Boolean).join(' - ') || 'Untitled profile';
+    var profile = findProfile(currentProfileId);
+    if (!profile) {
+      profile = { id: 'p' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6) };
+      profiles.profiles.push(profile);
+      currentProfileId = profile.id;
+    }
+    profile.name = name; profile.fields = fields; profile.updatedAt = Date.now();
+    profiles.lastUsedId = currentProfileId;
+    profiles.profiles.sort(function (x, y) { return x.name.localeCompare(y.name); });
+    persistProfiles();
+    drawProfiles();
+  }
+  function drawVenueMini() {
+    var v = venueByKey[key(state.book.venue)], box = $('#venueMini');
+    if (!box) return;
+    if (!v) { box.innerHTML = '<h2 style="font-size:24px">Your request</h2><p class="muted small">Pick a room to see its details.</p>'; return; }
+    var people = Number(state.book.participants) || 0, over = v.capacity && people > v.capacity;
+    box.innerHTML = '<h2 style="font-size:26px">' + esc(v.name) + '</h2><p class="muted small">' + esc([v.building, v.floor].filter(Boolean).join(', ') || v.type) + '</p>' +
+      '<div class="meta" style="margin-top:10px">' + venueFacts(v) + '</div>' +
+      (over ? '<p class="error-text" style="margin-top:10px">' + people + ' people is over the listed capacity of ' + v.capacity + '.</p>' : '');
+  }
+  function setStatus(cls, html) {
+    var el = $('#status');
+    if (!el) return;
+    el.className = 'status ' + cls;
+    el.innerHTML = html;
+    var btn = $('#generate');
+    if (btn && PRO) {
+      btn.textContent = cls === 'conflict' ? 'Fill the form anyway' : 'Fill the request form';
+      btn.className = 'btn ' + (cls === 'conflict' ? 'btn-danger' : 'btn-primary');
+    }
+  }
+  function checkAvailability() {
+    var s = state.book;
+    if (!s.venue || !s.date || !s.startTime || !s.endTime) {
+      setStatus('', '<strong><i class="ph-bold ph-calendar-dots" aria-hidden="true"></i>Availability</strong>Pick a room, date and times to check the calendar.');
+      return;
+    }
+    var start = toMinutes(s.startTime), end = toMinutes(s.endTime);
+    if (end <= start) { setStatus('error', '<strong>Check the times</strong>The end time must be later than the start time.'); return; }
+    if (!venueByKey[key(s.venue)]) {
+      setStatus('unknown', '<strong>Not checked</strong>' + esc(s.venue) + ' is not on the CFMO list, so its calendar can\'t be read.');
+      return;
+    }
+    var cacheKey = key(s.venue) + '|' + s.date;
+    if (dayCache[cacheKey]) { evaluateDay(dayCache[cacheKey]); return; }
+    if (!PRO && !left('check') && !(B.prefetch && B.prefetch.fn === 'apiVenueDay')) {
+      setStatus('blocked', '<strong><i class="ph-bold ph-lock-simple" aria-hidden="true"></i>Out of free checks today</strong>They reset at midnight. <a href="#/access" data-nav>Pro</a> checks as often as you need.');
+      return;
+    }
+    setStatus('', '<strong><i class="ph-bold ph-hourglass" aria-hidden="true"></i>Reading the room\'s calendar</strong>One moment.');
+    var args = [s.venue, s.date];
+    api('apiVenueDay', args).then(function (day) {
+      noteUsage(day.usage);
+      dayCache[cacheKey] = day;
+      if (key(state.book.venue) + '|' + state.book.date === cacheKey) evaluateDay(day, true);
+    }).catch(function (error) {
+      if (errorCode(error)) {
+        setStatus('blocked', '<strong><i class="ph-bold ph-lock-simple" aria-hidden="true"></i>Can\'t check right now</strong>' + esc(friendlyError(error)));
+        agi.react('limit');
+        return;
+      }
+      var url = reloadUrl('apiVenueDay', args, 'book', Object.assign({}, state.book));
+      setStatus('blocked', '<strong><i class="ph-bold ph-warning" aria-hidden="true"></i>Couldn\'t check this room</strong>' + esc(friendlyError(error)) +
+        (url ? '<div style="margin-top:10px"><a class="btn btn-sm" href="' + esc(url) + '" target="_top">Check with a page reload</a></div>' : ''));
+      agi.react('error');
+    });
+  }
+  function evaluateDay(day, fresh) {
+    var s = state.book;
+    if (!day.known) {
+      setStatus('unknown', '<strong>Not checked</strong>' + esc(s.venue) + ' is not on the CFMO list, so its calendar can\'t be read.');
+      return;
+    }
+    var start = toMinutes(s.startTime), end = toMinutes(s.endTime);
+    var clashes = day.bookings.filter(function (b) { return b.start < end && b.end > start; });
+    var outside = start < B.hours.openingMinute || end > B.hours.closingMinute;
+    var when = shortDate(s.date) + ', ' + clock(start) + ' - ' + clock(end);
+    var html = clashes.length
+      ? '<strong><i class="ph-bold ph-x-circle" aria-hidden="true"></i>Taken</strong>' + esc(day.venue) + ' is booked during ' + esc(when) + ':<ul>' +
+        clashes.map(function (b) { return '<li>' + esc(b.title) + ' (' + esc(eventTime(b)) + ')</li>'; }).join('') + '</ul>'
+      : '<strong><i class="ph-bold ph-check-circle" aria-hidden="true"></i>Free</strong>' + esc(day.venue) + ' has no bookings on ' + esc(when) + '.';
+    if (outside) html += '<div style="margin-top:6px">That is outside operating hours (' + clock(B.hours.openingMinute) + ' to ' + clock(B.hours.closingMinute) + ').</div>';
+    if (clashes.length || outside) {
+      var windows = freeWindows(day.bookings);
+      html += windows.length
+        ? '<div class="muted small" style="margin-top:10px">Free that day:</div><div class="slot-list">' + windows.map(function (w) {
+            return '<button type="button" class="chip chip-slot" data-ws="' + w[0] + '" data-we="' + w[1] + '">' + clock(w[0]) + ' - ' + clock(w[1]) + '</button>';
+          }).join('') + '</div>'
+        : '<div style="margin-top:6px">No free time that day.</div>';
+    }
+    setStatus(clashes.length ? 'conflict' : 'free', html);
+    if (fresh || clashes.length) agi.react(clashes.length ? 'conflict' : 'free');
+    $all('[data-ws]', $('#status')).forEach(function (b) {
+      b.addEventListener('click', function () {
+        var f = $('#bookForm'), ws = Number(b.getAttribute('data-ws')), we = Number(b.getAttribute('data-we'));
+        var length = Math.max(30, (toMinutes(f.endTime.value) - toMinutes(f.startTime.value)) || 120);
+        f.startTime.value = hhmm(ws);
+        f.endTime.value = hhmm(Math.min(we, ws + length));
+        syncBookState(); checkAvailability(); hideLink();
+      });
+    });
+  }
+  function freeWindows(bookings) {
+    var open = B.hours.openingMinute, close = B.hours.closingMinute;
+    var busy = bookings.map(function (b) { return [Math.max(b.start, open), Math.min(b.end, close)]; })
+      .filter(function (p) { return p[1] > p[0]; }).sort(function (a, b) { return a[0] - b[0]; });
+    var out = [], cursor = open;
+    busy.forEach(function (p) { if (p[0] > cursor) out.push([cursor, p[0]]); cursor = Math.max(cursor, p[1]); });
+    if (cursor < close) out.push([cursor, close]);
+    return out.filter(function (w) { return w[1] - w[0] >= 30; });
+  }
+  function generateLink() {
+    syncBookState();
+    var values = bookValues();
+    var required = B.form.requiredRequesterFields.concat(B.form.requiredEventFields);
+    var missing = F ? F.missing(values, required) : [];
+    var errors = requestErrors(values);
+    Object.keys(LABELS).forEach(function (n) { markField(n, errors[n] || (missing.indexOf(n) !== -1 ? 'Required.' : '')); });
+    var bad = Object.keys(errors);
+    var err = $('#formError');
+    if (missing.length || bad.length) {
+      err.textContent = missing.length
+        ? 'Fill in: ' + missing.map(function (n) { return LABELS[n] || n; }).join(', ') + '.'
+        : 'Fix the highlighted ' + (bad.length === 1 ? 'field' : 'fields') + ': ' + bad.map(function (n) { return LABELS[n] || n; }).join(', ') + '.';
+      err.hidden = false;
+      var first = missing.concat(bad)[0];
+      if (missing.concat(bad).some(function (n) { return B.form.requesterFields.indexOf(n) !== -1; })) $('#requesterBox').open = true;
+      var target = $('#bookForm [data-field="' + first + '"]');
+      if (target) { target.scrollIntoView({ block: 'center', behavior: 'smooth' }); var i = target.querySelector('input, select, textarea'); if (i) i.focus({ preventScroll: true }); }
+      agi.react(missing.length ? 'locked' : 'invalid', missing.length ? 'A few answers are still empty.' : errors[bad[0]]);
+      return;
+    }
+    err.hidden = true;
+    values.contactNumber = String(values.contactNumber).replace(/[\s()-]/g, '').replace(/^\+?63/, '').replace(/^0/, '');
+    saveCurrentProfile(values);
+    var btn = $('#generate');
+    btn.disabled = true;
+    agi.react('loading', 'Filling in the form…');
+    api('apiBuildRequestLink', [values]).then(function (result) {
+      noteUsage(result.usage);
+      $('#openForm').href = result.url;
+      $('#linkText').value = result.url;
+      $('#linkBox').hidden = false;
+      $('#openForm').focus();
+      toast('Form ready. Profile saved.');
+      agi.react('link');
+    }).catch(function (error) {
+      err.textContent = friendlyError(error);
+      err.hidden = false;
+      agi.react(errorCode(error) ? 'limit' : 'error');
+    }).then(function () { btn.disabled = false; });
+  }
+
+  // ---------- plan & access ----------
+  function renderAccess() {
+    var usageRows = ['search', 'schedule', 'check', 'link'].filter(function (k) { return (ACCOUNT.limits || {})[k]; }).map(function (k) {
+      return '<div class="usage-row"><span>' + esc(LIMIT_NAMES[k].charAt(0).toUpperCase() + LIMIT_NAMES[k].slice(1)) + '</span>' +
+        '<span class="num">' + ((ACCOUNT.usage || {})[k] || 0) + ' / ' + ACCOUNT.limits[k] + '</span></div>';
+    }).join('');
+    var masked = ACCOUNT.key ? 'HEVX-' + ACCOUNT.key.keyId + '-••••-••••' : '';
+    var requestUsed = ((ACCOUNT.usage || {}).request || 0) >= ((ACCOUNT.limits || {}).request || 1);
+
+    main.innerHTML = '<div class="page"><div class="wrap">' +
+      '<div class="page-head"><div><h1>Your plan</h1><p>Signed in as ' + esc(ACCOUNT.email) + '. Usage resets at midnight.</p></div></div>' +
+      '<div class="access-grid">' +
+        '<div class="panel access-card' + (PRO ? ' plan-pro' : '') + '">' +
+          '<h2 style="font-size:34px;display:flex;gap:10px;align-items:center">' + (PRO ? 'Pro <span class="badge badge-lock">ACTIVE</span>' : 'Free') + '</h2>' +
+          (PRO ? '<p class="muted">Key <span class="num">' + esc(masked) + '</span>' + (ACCOUNT.key.since ? ', active since ' + esc(ACCOUNT.key.since) : '') +
+              (ACCOUNT.key.expires ? '. Expires ' + esc(ACCOUNT.key.expires) : '') + '.</p>'
+            : '<p class="muted">Every @' + esc(ACCOUNT.domain) + ' account gets this plan.</p>') +
+          '<div><p class="label" style="margin-bottom:4px">Today</p>' + usageRows + '</div>' +
+        '</div>' +
+        '<div style="display:grid;gap:24px">' +
+          (PRO ? '<div class="panel access-card">' + emptyState(ART.key, 'Pro is on', 'Autofill, saved profiles and 14-day searches are switched on. Your key only works with this account, so there\'s no need to share it.',
+              '<a class="btn btn-primary" href="#/book" data-nav>Book a room</a>') + '</div>'
+            : (!ACCOUNT.accessReady
+              ? '<div class="panel access-card">' + emptyState(ART.lock, 'Pro keys aren\'t open yet', 'Check back soon.') + '</div>'
+              : '<form class="panel access-card" id="redeemForm"' + postAttrs('redeemKey') + '><h2 style="font-size:24px">Have a key?</h2>' +
+                  '<div class="key-box"><input class="input key" id="keyInput" name="key" placeholder="HEVX-XXXX-XXXX-XXXX" maxlength="19" autocomplete="off" spellcheck="false" aria-label="Access key">' +
+                  '<button class="btn btn-lemon" type="submit">Unlock Pro</button></div>' +
+                  '<p class="hint">Keys are tied to one account. A key sent to you only works with ' + esc(ACCOUNT.email) + '.</p>' +
+                  '<p class="error-text" id="redeemError" hidden></p></form>' +
+                '<form class="panel access-card" id="requestForm"' + (requestUsed ? '' : postAttrs('requestAccess')) + '><h2 style="font-size:24px">Request a key</h2>' +
+                  (requestUsed ? '<p class="muted">You sent a request today. If it\'s approved, the key is emailed to ' + esc(ACCOUNT.email) + '.</p>' :
+                  '<p class="muted">Tell us who you book for. Approved keys are emailed to ' + esc(ACCOUNT.email) + '.</p>' +
+                  '<div class="form-grid">' +
+                    '<label class="field"><span>Your name</span><input class="input" name="name" maxlength="80" required></label>' +
+                    '<label class="field"><span>Organization</span><input class="input" name="organization" maxlength="120" required></label>' +
+                    '<label class="field"><span>Role <span class="muted">(optional)</span></span><input class="input" name="role" maxlength="80" placeholder="e.g. Logistics head"></label>' +
+                    '<label class="field"><span>Contact number <span class="muted">(optional)</span></span><input class="input" name="contact" maxlength="30" inputmode="tel"></label>' +
+                    '<label class="field wide"><span>What will you use Pro for?</span><textarea class="input" name="purpose" maxlength="600" required placeholder="e.g. Weekly GA bookings and event planning for the org"></textarea></label>' +
+                    '<label style="position:absolute;left:-9999px" aria-hidden="true">Website<input name="website" tabindex="-1" autocomplete="off"></label>' +
+                  '</div>' +
+                  '<div><button class="btn btn-primary" type="submit"><i class="ph-bold ph-paper-plane-tilt" aria-hidden="true"></i>Send request</button></div>' +
+                  '<p class="error-text" id="requestError" hidden></p>') +
+                '</form>')) +
+        '</div>' +
+      '</div>' +
+      '<h2 class="section-title" style="margin-top:56px">Compare plans</h2>' + planCards() +
+    '</div></div>';
+
+    var keyInput = $('#keyInput');
+    if (keyInput) {
+      keyInput.addEventListener('input', function () {
+        // Group what was typed in fours; the server adds the HEVX prefix if it is missing.
+        var raw = keyInput.value.toUpperCase().replace(/[^0-9A-Z]/g, '').slice(0, 16);
+        keyInput.value = raw ? raw.match(/.{1,4}/g).join('-') : '';
+      });
+      $('#redeemForm').addEventListener('submit', function (e) {
+        // A normal page post: it works even when several Google accounts are signed in.
+        var err = $('#redeemError');
+        if (keyInput.value.replace(/[^0-9A-Z]/gi, '').length < 12) {
+          e.preventDefault();
+          err.textContent = 'Enter the whole key, like HEVX-XXXX-XXXX-XXXX.'; err.hidden = false;
+          agi.react('invalid', 'That key looks too short.');
+          return;
+        }
+        busy($('#redeemForm button[type=submit]'), 'Checking…');
+        agi.react('loading', 'Checking your key…');
+      });
+    }
+    var reqForm = $('#requestForm');
+    if (reqForm && reqForm.purpose) {
+      reqForm.addEventListener('submit', function (e) {
+        var err = $('#requestError');
+        var missing = ['name', 'organization', 'purpose'].filter(function (n) { return !reqForm[n].value.trim(); });
+        if (missing.length) {
+          e.preventDefault();
+          err.textContent = 'Fill in your name, organization and what you need Pro for.'; err.hidden = false;
+          reqForm[missing[0]].focus();
+          agi.react('locked', 'A few fields are still empty.');
+          return;
+        }
+        err.hidden = true;
+        busy($('#requestForm button[type=submit]'), 'Sending…');
+        agi.react('loading', 'Sending your request…');
+      });
+    }
+    showFlash();
+  }
+  function postAttrs(action) {
+    return ' method="post" action="' + esc(B.execUrl) + '" target="_top" accept-charset="UTF-8">' +
+      '<input type="hidden" name="action" value="' + action + '"><input type="hidden" name="token" value="' + esc(B.formToken || '') + '"';
+  }
+  function busy(btn, text) {
+    // Disable after the submit has started, or the browser drops the post.
+    setTimeout(function () { btn.disabled = true; btn.lastChild.textContent = text; }, 0);
+  }
+  // Result of a form post, shown once after the page reloads.
+  function showFlash() {
+    var f = B.flash;
+    if (!f) return;
+    B.flash = null;
+    if (f.action === 'requestAccess') {
+      var form = $('#requestForm');
+      if (f.ok) {
+        if (form) form.innerHTML = emptyState(ART.send, 'Request sent', 'If it\'s approved, your key is emailed to ' + ACCOUNT.email + '.');
+        toast('Request sent.');
+        agi.react('sent');
+      } else if (form) {
+        if (form.purpose && f.form) Object.keys(f.form).forEach(function (n) { if (form[n]) form[n].value = f.form[n]; });
+        var err = $('#requestError');
+        if (err) { err.textContent = f.message; err.hidden = false; }
+        else form.insertAdjacentHTML('beforeend', '<p class="error-text">' + esc(f.message) + '</p>');
+        agi.react('error', 'That request didn\'t go through.');
+      }
+    } else if (f.action === 'redeemKey') {
+      if (f.ok) { toast('Pro unlocked. Your key is tied to ' + ACCOUNT.email + '.'); agi.react('pro'); }
+      else {
+        var rErr = $('#redeemError');
+        if (rErr) { rErr.textContent = f.message; rErr.hidden = false; }
+        agi.react('error', 'That key didn\'t work.');
+      }
+    }
+  }
+
+  // ---------- report an issue ----------
+  function browserSummary() {
+    var ua = navigator.userAgent, name = 'Browser', os = '';
+    var m = /Edg\/(\d+)/.exec(ua) || null;
+    if (m) name = 'Edge ' + m[1];
+    else if ((m = /(?:Chrome|CriOS)\/(\d+)/.exec(ua))) name = 'Chrome ' + m[1];
+    else if ((m = /(?:Firefox|FxiOS)\/(\d+)/.exec(ua))) name = 'Firefox ' + m[1];
+    else if ((m = /Version\/(\d+).*Safari/.exec(ua))) name = 'Safari ' + m[1];
+    os = /iPhone|iPad/.test(ua) ? 'iOS' : /Android/.test(ua) ? 'Android' : /Mac OS X/.test(ua) ? 'macOS' : /Windows/.test(ua) ? 'Windows' : /Linux/.test(ua) ? 'Linux' : '';
+    return name + (os ? ' on ' + os : '');
+  }
+  function renderReport() {
+    var s = state.report, kinds = (B.issues && B.issues.kinds) || {}, pages = (B.issues && B.issues.pages) || ROUTE_NAMES;
+    var page = s.page || s.from || '';
+    var icons = { bug: 'ph-bug', data: 'ph-buildings', form: 'ph-clipboard-text', idea: 'ph-lightbulb', other: 'ph-chat-circle-dots' };
+    var screen = window.screen ? window.screen.width + 'x' + window.screen.height : '';
+    main.innerHTML = '<div class="page"><div class="wrap">' +
+      '<div class="page-head"><div><h1>Report an issue</h1>' +
+        '<p>Something broken, a room with wrong details, or an idea? It goes straight to the person who runs this site.</p></div></div>' +
+      '<div class="report-grid">' +
+        '<form class="panel report-form" id="reportForm"' + postAttrs('reportIssue') + '>' +
+          '<fieldset class="kind-pick"><legend>What kind of issue?</legend><div class="kind-grid">' +
+            Object.keys(kinds).map(function (k) {
+              return '<label class="kind-opt"><input type="radio" name="kind" value="' + k + '"' + (s.kind === k ? ' checked' : '') + '>' +
+                '<span><i class="ph-bold ' + (icons[k] || 'ph-chat-circle-dots') + '" aria-hidden="true"></i>' + esc(kinds[k]) + '</span></label>';
+            }).join('') + '</div></fieldset>' +
+          '<label class="field"><span>Where did it happen?</span><select class="input" name="page">' +
+            Object.keys(pages).map(function (p) { return '<option value="' + esc(p) + '"' + (p === page ? ' selected' : '') + '>' + esc(pages[p]) + '</option>'; }).join('') +
+          '</select></label>' +
+          '<div class="field" data-field="message"><span>What happened?</span>' +
+            '<textarea class="input" name="message" rows="6" maxlength="2000" required placeholder="What you did, what you expected, and what happened instead. Room names and times help.">' + esc(s.message) + '</textarea>' +
+            '<small class="hint"><span id="msgCount">0</span> / 2000</small></div>' +
+          '<div class="report-toggles">' +
+            '<label class="switch"><input type="checkbox" name="details" checked>Include technical details</label>' +
+            '<p class="hint" id="detailsNote"></p>' +
+            '<label class="switch"><input type="checkbox" name="copy" checked>Email me a copy</label>' +
+          '</div>' +
+          '<input type="hidden" name="browser" value="' + esc(browserSummary()) + '">' +
+          '<input type="hidden" name="screen" value="' + esc(screen) + '">' +
+          '<input type="hidden" name="lastError" value="' + esc(LAST_ERROR) + '">' +
+          '<label style="position:absolute;left:-9999px" aria-hidden="true">Website<input name="website" tabindex="-1" autocomplete="off"></label>' +
+          '<p class="error-text" id="reportError" hidden></p>' +
+          '<div><button class="btn btn-primary" type="submit"><i class="ph-bold ph-paper-plane-tilt" aria-hidden="true"></i>Send report</button></div>' +
+        '</form>' +
+        '<aside class="panel report-aside">' + ART.send +
+          '<h2>What happens next</h2>' +
+          '<ul class="next-list">' +
+            '<li><i class="ph-bold ph-envelope-simple" aria-hidden="true"></i><span>Your report is emailed to the site owner right away, with your account so they can reply.</span></li>' +
+            '<li><i class="ph-bold ph-hash" aria-hidden="true"></i><span>You get a report ID. Keep it if you want to follow up.</span></li>' +
+            '<li><i class="ph-bold ph-buildings" aria-hidden="true"></i><span>For a booking problem with CFMO itself, contact CFMO directly. This site only reads their calendars.</span></li>' +
+          '</ul></aside>' +
+      '</div></div></div>';
+
+    var form = $('#reportForm');
+    function count() { $('#msgCount').textContent = form.message.value.length; }
+    function note() {
+      $('#detailsNote').textContent = form.details.checked
+        ? 'Adds the page, ' + browserSummary() + ', screen ' + screen + (LAST_ERROR ? ', and the last error you saw' : '') + '. No passwords or form answers.'
+        : 'Only your message, the page and your account are sent.';
+    }
+    form.message.addEventListener('input', function () { s.message = form.message.value; count(); });
+    form.details.addEventListener('change', note);
+    $all('input[name=kind]', form).forEach(function (r) { r.addEventListener('change', function () { s.kind = r.value; agi.react('change'); }); });
+    form.page.addEventListener('change', function () { s.page = form.page.value; });
+    form.addEventListener('submit', function (e) {
+      var err = $('#reportError');
+      if (form.message.value.trim().length < 10) {
+        e.preventDefault();
+        err.textContent = 'Tell us a little more, at least a sentence.'; err.hidden = false;
+        form.message.focus();
+        agi.react('invalid', 'A bit more detail helps a lot.');
+        return;
+      }
+      err.hidden = true;
+      busy($('#reportForm button[type=submit]'), 'Sending…');
+      agi.react('loading', 'Sending your report…');
+    });
+    count(); note();
+    showReportFlash();
+  }
+  function showReportFlash() {
+    var f = B.flash;
+    if (!f || f.action !== 'reportIssue') return;
+    B.flash = null;
+    var form = $('#reportForm');
+    if (f.ok) {
+      state.report.message = '';
+      form.outerHTML = '<div class="panel report-form">' + emptyState(ART.send, 'Report sent',
+        'Thanks for flagging it. Your report ID is ' + (f.id || '') + '. If more details are needed, you will get an email.',
+        '<a class="btn" href="#/" data-nav>Back to home</a>') + '</div>';
+      toast('Report sent. ID ' + (f.id || ''));
+      agi.react('sent', 'Sent! Thanks for helping fix things.');
+    } else {
+      if (f.form) {
+        if (f.form.message) form.message.value = f.form.message;
+        var k = form.querySelector('input[name=kind][value="' + f.form.kind + '"]'); if (k) k.checked = true;
+        if (f.form.page !== undefined) form.page.value = f.form.page;
+        $('#msgCount').textContent = form.message.value.length;
+      }
+      var err = $('#reportError'); err.textContent = f.message; err.hidden = false;
+      agi.react('error', 'That report didn\'t go through.');
+    }
+  }
+
+  // ---------- start ----------
+  $('#footerRefresh').textContent = B.lastRefresh ? 'Venue list last synced with CFMO on ' + B.lastRefresh + '.' : '';
+  $('#footerLinks').innerHTML = (ACCOUNT.plan !== 'none' ? '<a href="#/report" data-nav>Report an issue</a>' : '') + [['Venue availability (CFMO)', B.links.availability], ['Reservation forms', B.links.forms],
+    ['Venue layouts', B.links.layout], ['OSA managed venues', B.links.osa]].map(function (l) {
+    return '<a href="' + esc(l[1]) + '" target="_blank" rel="noopener">' + esc(l[0]) + '</a>';
+  }).join('');
+  drawPlanChip();
+
+  var hour = new Date().getHours();
+  setTimeout(function () {
+    agi.react('hello', (hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening') + '! I\'m Agi. I keep an eye on the room calendars.');
+  }, 500);
+  if (B.view) show(B.view);
+  else if (HISTORY && google.script.url) google.script.url.getLocation(function (loc) { show(loc.hash || ''); });
+  else show(location.hash);
+})();
+</script>

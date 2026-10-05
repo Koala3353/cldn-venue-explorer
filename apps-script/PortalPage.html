@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <base target="_top">
+  <meta charset="utf-8">
+  <meta name="color-scheme" content="light dark">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/bold/style.css">
+  <?!= include_('PortalStyles') ?>
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+
+  <header class="topbar">
+    <div class="topbar-inner">
+      <a class="brand" href="#/" data-nav aria-label="HE Venue Explorer home">
+        <svg class="brand-mark" viewBox="0 0 40 40" aria-hidden="true">
+          <rect x="3" y="6" width="34" height="31" rx="7" fill="var(--card)" stroke="var(--edge)" stroke-width="3"/>
+          <path d="M3 15h34" stroke="var(--edge)" stroke-width="3"/>
+          <path d="M12 3v7M28 3v7" stroke="var(--edge)" stroke-width="3" stroke-linecap="round"/>
+          <rect x="9" y="20" width="7" height="6" rx="2" fill="var(--hair)"/>
+          <rect x="24" y="20" width="7" height="6" rx="2" fill="var(--hair)"/>
+          <rect x="16.5" y="27" width="7" height="6" rx="2" fill="var(--cobalt)"/>
+        </svg>
+        <span class="brand-name">Venue Explorer</span>
+      </a>
+      <nav class="nav" aria-label="Main">
+        <a href="#/find" data-nav data-route="find">Find a slot</a>
+        <a href="#/schedule" data-nav data-route="schedule">Schedule</a>
+        <a href="#/venues" data-nav data-route="venues">Venues</a>
+        <a href="#/book" data-nav data-route="book">Book</a>
+      </nav>
+      <div class="topbar-actions">
+        <a class="plan-chip" id="planChip" href="#/access" data-nav data-route="access"></a>
+        <button class="icon-btn" id="themeToggle" type="button" aria-label="Switch light or dark mode">
+          <i class="ph-bold ph-moon" aria-hidden="true"></i>
+        </button>
+        <div class="acct">
+          <button class="acct-btn" id="acctBtn" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="acctMenu" aria-label="Account">
+            <span id="acctInitial" aria-hidden="true"></span>
+          </button>
+          <div class="acct-menu" id="acctMenu" hidden></div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main id="main" tabindex="-1"></main>
+
+  <footer class="footer">
+    <div class="footer-inner">
+      <div class="footer-about">
+        <p class="footer-title">HE Venue Explorer</p>
+        <p class="muted small" id="footerRefresh"></p>
+        <p class="credits">Made by <strong>Keene Brigado</strong>. Special thanks to <strong>David Yu</strong>.</p>
+        <p class="muted small">Room data comes from the CFMO venue calendars. A room is only booked once you submit the official request form.</p>
+        <button class="link-btn small" id="agiReturn" type="button" hidden>Bring Agi back</button>
+      </div>
+      <div class="footer-links" id="footerLinks"></div>
+    </div>
+  </footer>
+
+  <nav class="tabbar" aria-label="Main">
+    <a href="#/" data-nav data-route=""><i class="ph-bold ph-house" aria-hidden="true"></i><span>Home</span></a>
+    <a href="#/find" data-nav data-route="find"><i class="ph-bold ph-magnifying-glass" aria-hidden="true"></i><span>Find</span></a>
+    <a href="#/schedule" data-nav data-route="schedule"><i class="ph-bold ph-calendar-blank" aria-hidden="true"></i><span>Schedule</span></a>
+    <a href="#/venues" data-nav data-route="venues"><i class="ph-bold ph-buildings" aria-hidden="true"></i><span>Venues</span></a>
+    <a href="#/book" data-nav data-route="book"><i class="ph-bold ph-paper-plane-tilt" aria-hidden="true"></i><span>Book</span></a>
+  </nav>
+
+  <div class="toast-region" id="toasts" role="status" aria-live="polite"></div>
+  <div id="agiRoot"></div>
+
+  <script>
+    window.BOOT = <?!= bootJson ?>;
+  </script>
+  <?!= include_('PortalMascot') ?>
+  <?!= include_('RequestShared') ?>
+  <?!= include_('PortalApp') ?>
+</body>
+</html>
