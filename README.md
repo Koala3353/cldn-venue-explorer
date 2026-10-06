@@ -53,8 +53,8 @@ Everyone with a school account gets Free. Pro is unlocked with a one-person acce
 | | Free | Pro |
 |---|---|---|
 | Days per search | 1 | 14 |
-| Slot searches per day | 20 | 300 |
-| Schedules per day | 30 | 300 |
+| Slot searches per day | 10 | 300 |
+| Schedules per day | 15 | 300 |
 | Prefilled CFMO links | – | 150 / day |
 | Saved org profiles | – | ✓ |
 
