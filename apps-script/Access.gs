@@ -36,7 +36,7 @@ const PLANS = Object.freeze({
   free: Object.freeze({
     label: 'Free',
     maxDays: 1,
-    limits: Object.freeze({ search: 3, schedule: 5, check: 15, link: 0, request: 1 }),
+    limits: Object.freeze({ search: 20, schedule: 30, check: 40, link: 0, request: 1 }),
   }),
   pro: Object.freeze({
     label: 'Pro',
