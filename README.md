@@ -14,6 +14,8 @@ A Google Apps Script web app that reads the CFMO venue calendars for all 152 HE 
 
 <img src="docs/screenshots/home.png" alt="Venue Explorer home page with the Free right now panel" width="900">
 
+<img src="docs/screenshots/features.png" alt="Home page feature showcase with an animated free-slot scene" width="900">
+
 </div>
 
 ---
@@ -43,7 +45,7 @@ Booking a room used to mean opening CFMO calendars one at a time, writing down t
 </tr>
 </table>
 
-It works on phones, has a dark mode, and comes with a small pet mascot that naps, wanders around and gets dizzy if you spin it.
+It works on phones, has a dark mode, and comes with Agi, a small pet bird that gives tips for whatever page you're on, chats, naps, and does stunts on its own: hops, flights, falls, backflips, moonwalks and more.
 
 
 ## Plans

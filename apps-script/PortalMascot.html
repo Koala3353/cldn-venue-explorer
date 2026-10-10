@@ -83,6 +83,28 @@
   .agi-bob.a-wave .agi-wing-r, .agi-bob.a-wave .agi-wing-l { animation: aWave 260ms ease-in-out 3 alternate; }
   .agi-bob.a-flap .agi-wing-r, .agi-bob.a-flap .agi-wing-l, .agi-bob.a-dance .agi-wing-r, .agi-bob.a-dance .agi-wing-l { animation: aWave 140ms ease-in-out 8 alternate; }
   .agi-bob.a-flap { animation: aFlap 1.1s ease-in-out; }
+  .agi-bob.a-hop3 { animation: aHop3 1.3s var(--ease); }
+  .agi-bob.a-fly { animation: aFly 2.6s ease-in-out; }
+  .agi-bob.a-fall { animation: aFall 1.4s cubic-bezier(.5,0,.75,0) both; }
+  .agi-bob.a-backflip { animation: aBackflip 1s var(--ease); }
+  .agi-bob.a-moonwalk { animation: aMoonwalk 2.2s ease-in-out; }
+  .agi-bob.a-bounce { animation: aBounce 1.6s linear; }
+  .agi-bob.a-peck { animation: aPeck 1.2s ease-in-out; }
+  .agi-bob.a-zoom { animation: aZoom 1.6s ease-in-out; }
+  .agi-bob.a-float { animation: aFloat 3s ease-in-out; }
+  .agi-bob.a-fly .agi-wing-r, .agi-bob.a-fly .agi-wing-l, .agi-bob.a-float .agi-wing-r, .agi-bob.a-float .agi-wing-l,
+  .agi-bob.a-fall .agi-wing-r, .agi-bob.a-fall .agi-wing-l { animation: aWave 110ms ease-in-out 20 alternate; }
+  .agi-bob.a-moonwalk .agi-leg, .agi-bob.a-zoom .agi-leg { animation: aStep 180ms ease-in-out 10 alternate; }
+  @keyframes aStep { from { transform: rotate(-18deg); } to { transform: rotate(18deg); } }
+  @keyframes aHop3 { 0%, 33%, 66%, 100% { transform: none; } 12% { transform: translate(-10px, -16px); } 45% { transform: translate(-20px, -20px) rotate(-6deg); } 78% { transform: translate(-6px, -12px); } 90% { transform: scale(1.08, .92); } }
+  @keyframes aFly { 0% { transform: none; } 15% { transform: translateY(6px) scale(1.06, .9); } 35% { transform: translate(-30px, -110px) rotate(-12deg); } 55% { transform: translate(20px, -140px) rotate(10deg); } 75% { transform: translate(-6px, -60px) rotate(-4deg); } 92% { transform: translateY(0) scale(1.1, .88); } 100% { transform: none; } }
+  @keyframes aFall { 0% { transform: translateY(-240px) rotate(-30deg); opacity: 0; } 8% { opacity: 1; } 60% { transform: translateY(0) rotate(8deg) scale(1.2, .75); } 72% { transform: translateY(-26px) rotate(-6deg); } 84% { transform: translateY(0) scale(1.08, .9); } 100% { transform: none; } }
+  @keyframes aBackflip { 0% { transform: none; } 20% { transform: scale(1.08, .88); } 60% { transform: translateY(-50px) rotate(-360deg); } 82% { transform: translateY(0) rotate(-360deg) scale(1.08, .9); } 100% { transform: rotate(-360deg); } }
+  @keyframes aMoonwalk { 0%, 100% { transform: none; } 45%, 55% { transform: translateX(46px) rotate(-4deg); } }
+  @keyframes aBounce { 0%, 100% { transform: none; } 10%, 40%, 70% { transform: scale(1.12, .86); } 25% { transform: translateY(-34px); } 55% { transform: translateY(-22px); } 85% { transform: translateY(-10px); } }
+  @keyframes aPeck { 0%, 100% { transform: none; } 15%, 45%, 75% { transform: rotate(32deg) translate(6px, 6px); } 30%, 60%, 90% { transform: rotate(4deg); } }
+  @keyframes aZoom { 0%, 100% { transform: none; } 20% { transform: translateX(-60px) skewX(10deg); } 40% { transform: translateX(30px) skewX(-10deg) scaleX(-1); } 60% { transform: translateX(-40px) skewX(8deg); } 80% { transform: translateX(16px) scaleX(-1); } }
+  @keyframes aFloat { 0% { transform: none; } 25% { transform: scale(1.3, 1.25); } 60% { transform: translateY(-120px) scale(1.3, 1.25) rotate(6deg); } 80% { transform: translateY(-40px) scale(1.05) rotate(-4deg); } 100% { transform: none; } }
   @keyframes aPop { 0% { transform: translateY(30px) scale(0.6); opacity: 0; } 60% { transform: translateY(-6px) scale(1.06); opacity: 1; } 100% { transform: none; } }
   @keyframes aHop { 40% { transform: translateY(-12px); } 100% { transform: none; } }
   @keyframes aSquish { 40% { transform: scale(1.1, 0.86); } 100% { transform: none; } }
@@ -204,7 +226,49 @@ window.Agi = (function () {
     [0.8, function () { act('squint', 'sneeze', 'puff', null, maybe(['Achoo! Dusty calendars.'])); }],
     [0.8, function () { act('normal', 'peek', null, null, null, 1700); }],
     [0.8, function () { act('normal', 'shiver', null, 'teal', maybe(['Brr, the aircon in here.'])); }],
+    // The nine bigger stunts.
+    [1.2, function () { act('happy', 'hop3', null, null, maybe(['Hop, hop, hop!', 'Leg day.'])); }],
+    [1, function () { act('wow', 'fly', null, 'sky', maybe(['Wheee, I can see all of HE from up here!', 'Flight test number 47.']), 2600); }],
+    [0.8, function () { act('x', 'fall', 'stars', null, maybe(['Who moved the ceiling?', 'Gravity: 1, Agi: 0.']), 2400); }],
+    [0.9, function () { act('wink', 'backflip', 'sparkles', null, maybe(['Ten out of ten. Judges?', 'Nailed it.'])); }],
+    [0.9, function () { act('wink', 'moonwalk', 'notes', 'grape', maybe(['Smooth.', 'Hee-hee!']), 2200); }],
+    [1, function () { act('happy', 'bounce', null, 'lemon', maybe(['Boing boing boing.'])); }],
+    [1, function () { act('squint', 'peck', null, 'sand', maybe(['Found a crumb.', 'Peck peck. Floor tastes like Monday.'])); }],
+    [0.8, function () { act('wow', 'zoom', 'puff', 'coral', maybe(['ZOOMIES!', 'Too much coffee.'])); }],
+    [0.7, function () { act('love', 'float', 'hearts', 'pink', maybe(['I\'m a balloon now.', 'Floaaating…']), 3000); }],
+    // Talking: a tip for this page, or a random thought.
+    [2.5, function () { act('normal', 'nod', null, null, pageTip()); }],
+    [2, function () { act(pick(['happy', 'wink', 'normal']), 'tilt', null, null, chatter()); }],
   ];
+  var route = (location.hash || '').replace(/^#\/?/, '').split(/[?\/]/)[0];
+  var PAGE_TIPS = {
+    '': ['The "Free right now" list updates every time you open this page.', 'Tap a room on the right to see its schedule.',
+      'Pro is free. Ask for a key on the Plan page.', 'Two minutes is all a booking takes once your org is saved.'],
+    find: ['Open "More options" to search an exact window, like 1 to 3 PM.', 'Set "People" so tiny rooms drop out of the list.',
+      'Sort by longest gap if your event runs long.', 'Click a free time to carry it straight into Book.', 'Pro can search 14 days at once.',
+      'Turn on Air-con if it\'s a hot day. Trust me.'],
+    schedule: ['Grey blocks are bookings. The gaps between are yours.', 'A long event shows once per day, not once per hour.',
+      'Pick a date range to see a room\'s whole week.', 'Click a gap to book that exact time.'],
+    venues: ['Use the chips to filter by venue type.', 'Search works on equipment too. Try "mic" or "projector".',
+      '"Specs not on file" means CFMO hasn\'t listed the room\'s details.', 'Each card has Schedule and Book shortcuts.'],
+    book: ['CFMO wants requests 3 working days ahead. Earlier is safer.', 'The form opens 9 to 11 AM and 2 to 4 PM on weekdays.',
+      'Only the first 60 requests a day get in. Be quick at 9!', 'Save the link the night before, then open it right at 9 AM.',
+      'Write N/A if there are no group activities.', 'Your proof of approval link must be shared so CFMO can open it.',
+      'If the form shows old answers, press Clear form at the bottom.', 'Answer the Conforme question yourself at the end.'],
+    access: ['Your key only works with your own account.', 'Pro keys are emailed once they\'re approved.', 'Lost your key? Report an issue and I\'ll pass it on.'],
+    report: ['Screenshots help. Paste a Drive link in your message.', 'Turn on technical details if something broke.'],
+  };
+  var CHATTER = ['Did you know HE has 152 bookable rooms? I\'ve napped in most.', 'I tried booking a room for myself. CFMO said no.',
+    'Fun fact: I\'m powered by spreadsheets.', 'If a room is free, it\'s free. That\'s my whole philosophy.', 'Remember to drink water.',
+    'You\'re doing great. Probably.', 'Is it lunch yet?', 'I counted the chairs in CTC 205. Lost count at 4.',
+    'Somewhere, a projector isn\'t working. Not my fault.', 'Every room has a story. Most are about org GAs.',
+    'Don\'t forget your approver\'s name!', 'Psst. You can drag me around.', 'Rub my head. Go on.', 'Plan early, book early, sleep well.'];
+  function pageTip() { var list = PAGE_TIPS[route] || PAGE_TIPS['']; return pick(list); }
+  function chatter() {
+    var h = new Date().getHours();
+    var timed = h < 9 ? ['Early bird! The form opens at 9.'] : h >= 22 ? ['It\'s late. Rooms close at 10 PM anyway.'] : h >= 12 && h < 13 ? ['Lunch break? Rooms are quieter now.'] : [];
+    return pick(CHATTER.concat(timed));
+  }
   var TIPS = [
     'Click a time in the results to start a booking.',
     'Schedules show the free gaps between bookings in blue.',
@@ -376,6 +440,7 @@ window.Agi = (function () {
     if (wrap.hidden) return;
     var r = REACTIONS[type];
     if (!r) return;
+    if (type === 'nav') route = (options && options.route) || '';
     var now = Date.now();
     if (r[4] < lastPriority && now - lastAt < 700) return;
     options = options || {};
@@ -485,7 +550,7 @@ window.Agi = (function () {
         lastAt = Date.now(); lastPriority = 0;
       }
       scheduleAntic();
-    }, 9000 + Math.random() * 11000);
+    }, 7000 + Math.random() * 9000);
   }
 
   // Blink every few seconds while the face is relaxed.
@@ -569,7 +634,7 @@ window.Agi = (function () {
     clicks = clicks.filter(function (t) { return now - t < 1400; });
     clicks.push(now);
     if (clicks.length >= 4) { clicks = []; react('dizzy'); return; }
-    react('poke', pick(TIPS));
+    react('poke', Math.random() < 0.65 ? pageTip() : pick(TIPS.concat(CHATTER)));
   });
   function startDrag() {
     if (walking) stopWalking();
