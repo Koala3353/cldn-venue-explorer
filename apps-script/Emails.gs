@@ -13,16 +13,16 @@
 
 const EMAIL = Object.freeze({
   senderName: 'HE Venue Explorer',
-  navy: '#0d1430',
-  ink2: '#4b5575',
-  muted: '#7a83a0',
-  lime: '#c4f03c',
-  limeSoft: '#f0fbcf',
-  limeText: '#3f5c00',
-  page: '#eef1f7',
+  navy: '#17191c',
+  ink2: '#5a5f66',
+  muted: '#8a8e94',
+  lime: '#c94a0a',
+  limeSoft: '#fbe9df',
+  limeText: '#a63c07',
+  page: '#f1f1ef',
   card: '#ffffff',
-  line: '#e3e7f0',
-  sunk: '#f4f6fa',
+  line: '#e4e4e1',
+  sunk: '#f6f6f4',
   bad: '#b42318',
   badSoft: '#ffe4e0',
   font: "'Geist','Helvetica Neue',Helvetica,Arial,sans-serif",
@@ -114,9 +114,9 @@ function emailLogo_() {
     '<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="background:' + E.navy + ';border-radius:9px">' +
       '<tr><td style="padding:9px 7px 7px">' +
         '<table role="presentation" cellpadding="0" cellspacing="0" border="0">' +
-          '<tr>' + cell('#3a4470') + gap + cell(E.lime) + gap + cell('#3a4470') + '</tr>' +
+          '<tr>' + cell('#3a3d42') + gap + cell(E.lime) + gap + cell('#3a3d42') + '</tr>' +
           '<tr><td colspan="5" style="height:3px;font-size:0;line-height:3px">&nbsp;</td></tr>' +
-          '<tr>' + cell(E.lime) + gap + cell('#3a4470') + gap + cell(E.lime) + '</tr>' +
+          '<tr>' + cell(E.lime) + gap + cell('#3a3d42') + gap + cell(E.lime) + '</tr>' +
         '</table>' +
       '</td></tr></table>';
   return '<table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>' +
@@ -171,7 +171,7 @@ function emailKeyBlock_(key) {
   return '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:4px 0 22px"><tr>' +
     '<td align="center" style="background:' + E.navy + ';border-radius:18px;padding:26px 16px">' +
       '<p style="margin:0 0 10px;font:700 11px/1 ' + E.font + ';letter-spacing:.14em;text-transform:uppercase;color:#9aa4c4">Your access key</p>' +
-      '<p style="margin:0;font:700 26px/1.2 ' + E.mono + ';letter-spacing:.08em;color:' + E.lime + ';word-break:break-all">' + emailText_(key) + '</p>' +
+      '<p style="margin:0;font:700 26px/1.2 ' + E.mono + ';letter-spacing:.08em;color:#ff9b6b;word-break:break-all">' + emailText_(key) + '</p>' +
     '</td></tr></table>';
 }
 
@@ -184,7 +184,7 @@ function emailSteps_(steps) {
       return '<tr>' +
         '<td width="34" valign="top" style="padding:0 0 14px">' +
           '<table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>' +
-            '<td width="26" height="26" align="center" style="width:26px;height:26px;border-radius:99px;background:' + E.lime + ';font:800 13px/26px ' + E.font + ';color:' + E.navy + '">' + (i + 1) + '</td>' +
+            '<td width="26" height="26" align="center" style="width:26px;height:26px;border-radius:99px;background:' + E.lime + ';font:800 13px/26px ' + E.font + ';color:#ffffff">' + (i + 1) + '</td>' +
           '</tr></table>' +
         '</td>' +
         '<td valign="top" style="padding:3px 0 14px 8px;font:400 15px/1.55 ' + E.font + ';color:' + E.ink2 + '">' + step + '</td>' +

@@ -53,8 +53,28 @@
 
   // ---------- custom illustrations ----------
   var ART = {
-    // A calendar page being scanned: free slots light up in lime, busy ones grey, then a tick.
-    loader: function () {
+    // Loaders. 'calendar' scans a month page, 'clock' sweeps a day, 'form' writes a request.
+    loader: function (kind) {
+      if (kind === 'clock') {
+        var ticks = '';
+        for (var t = 0; t < 12; t++) ticks += '<path class="tk" d="M48 16v' + (t % 3 ? 4 : 7) + '" transform="rotate(' + t * 30 + ' 48 48)"/>';
+        return '<svg class="clk-loader" viewBox="0 0 96 96" aria-hidden="true">' +
+          '<circle class="face" cx="48" cy="48" r="38"/>' + ticks +
+          '<circle class="sweep" cx="48" cy="48" r="30" pathLength="100"/>' +
+          '<path class="hh" d="M48 48V31"/><path class="mh" d="M48 48V22"/><circle class="hub" cx="48" cy="48" r="4.5"/>' +
+        '</svg>';
+      }
+      if (kind === 'form') {
+        var lines = '';
+        [[30, 46], [42, 40], [54, 50], [66, 30]].forEach(function (l, i) {
+          lines += '<rect class="lbl" x="22" y="' + (l[0] - 5) + '" width="14" height="3" rx="1.5"/>' +
+            '<path class="ln" d="M40 ' + l[0] + 'h' + l[1] + '" pathLength="100" style="--d:' + i + '"/>';
+        });
+        return '<svg class="doc-loader" viewBox="0 0 96 96" aria-hidden="true">' +
+          '<rect class="sheet" x="14" y="10" width="68" height="78" rx="12"/>' + lines +
+          '<g class="pen"><path d="M0 0l14-14 5 5-14 14H0z"/></g>' +
+        '</svg>';
+      }
       var busy = { 1: 1, 6: 1, 8: 1 }, cells = '';
       for (var i = 0; i < 12; i++) {
         var col = i % 4, row = Math.floor(i / 4);
@@ -75,10 +95,12 @@
     oops: '<svg viewBox="0 0 112 112" aria-hidden="true"><path d="M30 78c-12 0-20-8-20-19 0-10 8-18 18-18 3-13 14-21 27-21 15 0 27 11 28 25 10 1 18 9 18 19 0 8-7 14-15 14z" fill="var(--card)" stroke="var(--edge)" stroke-width="3.5" stroke-linejoin="round"/><path d="M42 52l8 8M50 52l-8 8M62 52l8 8M70 52l-8 8" stroke="var(--edge)" stroke-width="3" stroke-linecap="round"/><path d="M48 70c5-4 11-4 16 0" fill="none" stroke="var(--edge)" stroke-width="3" stroke-linecap="round"/><path d="M40 90l-4 10M56 90v12M72 90l4 10" stroke="var(--coral)" stroke-width="4" stroke-linecap="round"/></svg>',
     lock: '<svg viewBox="0 0 112 112" aria-hidden="true"><path d="M36 50V38a20 20 0 0 1 40 0v12" fill="none" stroke="var(--edge)" stroke-width="5"/><rect x="24" y="48" width="64" height="48" rx="12" fill="var(--lemon)" stroke="var(--edge)" stroke-width="3.5"/><circle cx="56" cy="68" r="6" fill="var(--edge)"/><path d="M56 72v10" stroke="var(--edge)" stroke-width="5" stroke-linecap="round"/><path d="M94 22l3 6 6 3-6 3-3 6-3-6-6-3 6-3z" fill="var(--card)" stroke="var(--edge)" stroke-width="2.5"/></svg>',
     key: '<svg viewBox="0 0 112 112" aria-hidden="true"><circle cx="38" cy="56" r="20" fill="var(--lemon)" stroke="var(--edge)" stroke-width="3.5"/><circle cx="38" cy="56" r="7" fill="var(--card)" stroke="var(--edge)" stroke-width="3"/><path d="M58 56h40M84 56v14M96 56v10" stroke="var(--edge)" stroke-width="5" stroke-linecap="round"/></svg>',
-    squiggle: '<svg viewBox="0 0 300 30" preserveAspectRatio="none" aria-hidden="true"><path d="M4 20c30-14 52-14 76 0s48 14 72 0 50-14 74 0 46 12 70 0"/></svg>',
+    // Small inline spinner for buttons and status lines: two arcs turning against each other.
+    spin: '<svg class="spin" viewBox="0 0 24 24" aria-hidden="true"><circle class="s1" cx="12" cy="12" r="9" pathLength="100"/><circle class="s2" cx="12" cy="12" r="5" pathLength="100"/></svg>',
+    squiggle: '<svg viewBox="0 0 300 30" preserveAspectRatio="none" aria-hidden="true"><path d="M4 22C80 10 210 6 296 14"/></svg>',
   };
-  function loader(text, rows) {
-    return '<div class="loader" role="status">' + ART.loader() + '<p>' + esc(text) + '</p></div>' +
+  function loader(text, rows, kind) {
+    return '<div class="loader" role="status">' + ART.loader(kind) + '<p>' + esc(text) + '<span class="dots" aria-hidden="true"><i></i><i></i><i></i></span></p></div>' +
       (rows ? '<div class="skeleton" aria-hidden="true"><span></span><span></span><span></span></div>' : '');
   }
   function emptyState(art, title, text, action) {
@@ -104,11 +126,12 @@
     entries.forEach(function (e) {
       if (!e.isIntersecting) return;
       e.target.classList.add('in');
+      if (e.target.classList.contains('stat')) countUp(e.target.querySelector('[data-count]'));
       revealer.unobserve(e.target);
     });
   }, { rootMargin: '0px 0px -8% 0px', threshold: 0.12 }) : null;
   function revealify(root) {
-    var targets = $all('.section .section-title, .section .section-lead, .flow-list, .bento, .plans, .venue-grid > *, .access-grid > *', root);
+    var targets = $all('.section .section-title, .section .section-lead, .flow-list, .bento, .plans, .feature, .stat, .venue-grid > *, .access-grid > *', root);
     targets.forEach(function (el, i) {
       if (!revealer) { el.classList.add('in'); return; }
       if (!el.classList.contains('flow-list')) el.classList.add('reveal');
@@ -390,7 +413,12 @@
     VENUES.forEach(function (v) { counts[v.type] = (counts[v.type] || 0) + 1; });
     var types = Object.keys(counts).sort(function (a, b) { return counts[b] - counts[a]; });
 
+    var soon = readSaved().filter(function (x) { var w = savedWhen(x); return w === 'Today' || w === 'Tomorrow'; });
     main.innerHTML =
+      (soon.length ? '<div class="wrap"><a class="saved-nudge" href="#/book" data-nav><i class="ph-bold ph-bookmark-simple" aria-hidden="true"></i>' +
+        '<span>You have ' + plural(soon.length, 'saved request') + ' for ' + esc(savedWhen(soon[0]).toLowerCase()) + '. ' +
+        esc((F && F.intakeStatus().open) ? 'The form is open now.' : 'Open it when the form starts taking requests.') + '</span>' +
+        '<strong>Go to Book <i class="ph-bold ph-arrow-right" aria-hidden="true"></i></strong></a></div>' : '') +
       '<section class="hero"><div class="wrap hero-grid">' +
         '<div>' +
           '<h1>' + words('Every free room in HE,', 0) + ' <span class="squiggle">' + words('on one page.', 5) + ART.squiggle + '</span></h1>' +
@@ -402,18 +430,25 @@
         '</div>' +
         '<div class="panel board">' +
           '<div class="board-head"><h2>Free right now</h2><span class="live" id="liveTime">LIVE</span></div>' +
-          '<div id="boardBody">' + loader('Reading the boards…') + '</div>' +
+          '<div id="boardBody">' + loader('Reading the boards') + '</div>' +
         '</div>' +
       '</div></section>' +
 
-      '<section class="section" style="padding-top:24px"><div class="wrap flow">' +
-        '<div><h2 class="section-title">From search to a filled-in form.</h2>' +
-          '<p class="section-lead">Most bookings take about two minutes.</p></div>' +
-        '<ol class="flow-list">' +
-          flowItem(ART.search, 'Search', 'Pick a day and filter by building, size, air-con or an exact time. Each result is an open gap in that room\'s calendar.') +
-          flowItem(ART.check, 'Check', 'When you choose a time, the room\'s calendar is read again. A clash shows up before you send anything.') +
-          flowItem(ART.send, 'Book', 'Pro fills the official CFMO request form with your saved org details. You review it and submit.') +
-        '</ol>' +
+      '<section class="stats-strip"><div class="wrap"><div class="stats">' +
+        stat(VENUES.length, 'venues on the CFMO list') +
+        stat(PRO ? 14 : 1, PRO ? 'days per search on Pro' : 'day per search, 14 on Pro') +
+        stat(18, 'form answers filled for you') +
+        stat(60, 'requests CFMO takes a day') +
+      '</div></div></section>' +
+
+      '<section class="section features"><div class="wrap">' +
+        '<p class="eyebrow">What it does</p>' +
+        '<h2 class="section-title">The booking chores, done for you.</h2>' +
+        '<p class="section-lead">Most bookings take about two minutes, from search to a filled-in CFMO form.</p>' +
+        feature(1, 'find', 'Find a free slot', 'Search every room for a day at once, or two weeks on Pro. Filter by building, headcount, air-con or an exact window like 1 to 3 PM. Every result is a gap in that room\'s CFMO calendar.', 'Find a slot', FEATURE_ART.find) +
+        feature(2, 'schedule', 'See a room\'s week', 'Open one room and read its bookings day by day, with the free time between them. A three-hour event shows once, not three times.', 'Open a schedule', FEATURE_ART.schedule) +
+        feature(3, 'book', 'Book without retyping', 'On Pro, pick a slot and the CFMO request form opens with your org, contact details and event already in it. The room\'s calendar is read again first, so a clash shows up before you send.', 'Book a room', FEATURE_ART.book) +
+        feature(4, 'book', 'Know if the form is open', 'CFMO only takes requests during intake hours, and only the first 60 a day. The Book page tells you which it is before you start typing.', 'Check the form', FEATURE_ART.status) +
       '</div></section>' +
 
       '<section class="section" style="padding-top:0"><div class="wrap">' +
@@ -443,9 +478,63 @@
   function words(text, start) {
     return text.split(' ').map(function (w, i) { return '<span class="word" style="--w:' + (start + i) + '">' + esc(w) + '</span>'; }).join(' ');
   }
-  function flowItem(art, title, text) {
-    return '<li class="panel-flat flow-item">' + art + '<div><h3>' + esc(title) + '</h3><p class="muted">' + esc(text) + '</p></div></li>';
+  function stat(n, label) {
+    return '<div class="stat"><strong data-count="' + n + '">' + n + '</strong><span>' + esc(label) + '</span></div>';
   }
+  function feature(n, route, title, text, cta, art) {
+    return '<article class="feature' + (n % 2 ? '' : ' flip') + '">' +
+      '<div class="feature-copy"><span class="feature-num">0' + n + '</span><h3>' + esc(title) + '</h3><p>' + esc(text) + '</p>' +
+        '<a class="link-arrow" href="#/' + route + '" data-nav>' + esc(cta) + '<i class="ph-bold ph-arrow-right" aria-hidden="true"></i></a></div>' +
+      '<div class="feature-art panel">' + art + '</div>' +
+    '</article>';
+  }
+  // Small animated scenes for the home page. They play once the card scrolls into view.
+  var FEATURE_ART = (function () {
+    function rows() {
+      var out = '', plan = [[[0, 22], [58, 30]], [[10, 34], [70, 18]], [[0, 12], [30, 26], [76, 16]]];
+      plan.forEach(function (busy, r) {
+        var y = 54 + r * 46;
+        out += '<rect class="fa-name" x="20" y="' + (y + 6) + '" width="44" height="8" rx="4"/>';
+        out += '<rect class="fa-track" x="78" y="' + y + '" width="222" height="20" rx="6"/>';
+        var cursor = 0;
+        busy.concat([[100, 0]]).forEach(function (b, i) {
+          if (b[0] > cursor) out += '<rect class="fa-free" x="' + (78 + cursor * 2.22) + '" y="' + y + '" width="' + ((b[0] - cursor) * 2.22) + '" height="20" rx="6" style="--d:' + (r * 3 + i) + '"/>';
+          if (b[1]) out += '<rect class="fa-busy" x="' + (78 + b[0] * 2.22) + '" y="' + y + '" width="' + (b[1] * 2.22) + '" height="20" rx="6"/>';
+          cursor = b[0] + b[1];
+        });
+      });
+      return out;
+    }
+    var find = '<svg class="fa fa-find" viewBox="0 0 320 200" aria-hidden="true">' +
+      '<rect class="fa-bar" x="20" y="16" width="200" height="22" rx="11"/><circle class="fa-glass" cx="36" cy="27" r="5"/>' +
+      '<rect class="fa-typed" x="48" y="24" width="96" height="6" rx="3"/>' +
+      '<rect class="fa-go" x="232" y="16" width="68" height="22" rx="11"/>' + rows() +
+      '<path class="fa-scan" d="M78 46v136"/></svg>';
+
+    var cols = '', blocks = [[0, 20, 30], [0, 70, 24], [1, 34, 40], [2, 18, 22], [2, 90, 26], [3, 50, 34], [4, 26, 20], [4, 64, 44]];
+    for (var c = 0; c < 5; c++) cols += '<text class="fa-day" x="' + (44 + c * 56) + '" y="30">' + ['MON', 'TUE', 'WED', 'THU', 'FRI'][c] + '</text><rect class="fa-col" x="' + (22 + c * 56) + '" y="40" width="46" height="144" rx="8"/>';
+    blocks.forEach(function (b, i) { cols += '<rect class="fa-ev" x="' + (26 + b[0] * 56) + '" y="' + (44 + b[1]) + '" width="38" height="' + b[2] + '" rx="5" style="--d:' + i + '"/>'; });
+    var schedule = '<svg class="fa fa-sched" viewBox="0 0 320 200" aria-hidden="true">' + cols +
+      '<rect class="fa-gap" x="138" y="104" width="38" height="44" rx="5"/></svg>';
+
+    var fields = '';
+    [[40, 150], [74, 110], [108, 170], [142, 90]].forEach(function (f, i) {
+      fields += '<rect class="fa-lbl" x="34" y="' + (f[0] - 8) + '" width="' + (36 + i * 6) + '" height="5" rx="2.5"/>' +
+        '<rect class="fa-field" x="34" y="' + f[0] + '" width="188" height="20" rx="6"/>' +
+        '<rect class="fa-fill" x="40" y="' + (f[0] + 7) + '" width="' + f[1] * 0.9 + '" height="6" rx="3" style="--d:' + i + '"/>';
+    });
+    var book = '<svg class="fa fa-book" viewBox="0 0 320 200" aria-hidden="true">' +
+      '<rect class="fa-sheet" x="18" y="14" width="220" height="172" rx="14"/>' + fields +
+      '<g class="fa-stamp"><circle cx="268" cy="150" r="30"/><path d="M254 150l10 10 18-20"/></g></svg>';
+
+    var status = '<svg class="fa fa-status" viewBox="0 0 320 200" aria-hidden="true">' +
+      '<circle class="fa-ring" cx="100" cy="100" r="62" pathLength="60"/><circle class="fa-arc" cx="100" cy="100" r="62" pathLength="60"/>' +
+      '<text class="fa-big" x="100" y="102">37</text><text class="fa-small" x="100" y="126">OF 60 TODAY</text>' +
+      '<rect class="fa-pill" x="186" y="62" width="116" height="30" rx="15"/><circle class="fa-dot" cx="204" cy="77" r="5"/>' +
+      '<text class="fa-pilltext" x="216" y="81">Open now</text>' +
+      '<rect class="fa-line" x="186" y="108" width="104" height="7" rx="3.5"/><rect class="fa-line" x="186" y="124" width="76" height="7" rx="3.5"/></svg>';
+    return { find: find, schedule: schedule, book: book, status: status };
+  })();
   function tile(type, count, cls, i) {
     if (!type) return '';
     return '<button class="tile ' + cls + '" data-type="' + esc(type) + '" style="--i:' + i + '"><span class="count">' + count + '</span>' +
@@ -625,10 +714,10 @@
     err.hidden = true;
     var box = $('#findResults');
     var count = VENUES.filter(function (v) { return !query.type || v.type === query.type; }).length;
-    box.innerHTML = '<div class="panel" style="margin-top:24px">' + loader('Checking ' + plural(count, 'calendar') + '…', true) + '</div>';
+    box.innerHTML = '<div class="panel" style="margin-top:24px">' + loader('Checking ' + plural(count, 'calendar'), true) + '</div>';
     agi.react('loading', 'Checking ' + plural(count, 'calendar') + '…');
     var btn = $('#findForm button[type=submit]');
-    btn.disabled = true;
+    btn.disabled = true; btn.classList.add('is-busy');
     api('apiAvailability', [query]).then(function (result) {
       noteUsage(result.usage);
       result.query = query;
@@ -637,7 +726,7 @@
     }).catch(function (error) {
       if (box.isConnected) box.innerHTML = '<div class="panel" style="margin-top:24px">' +
         failureBlock(error, reloadUrl('apiAvailability', [query], 'find', stripResult(state.find))) + '</div>';
-    }).then(function () { btn.disabled = false; });
+    }).then(function () { btn.disabled = false; btn.classList.remove('is-busy'); });
   }
   function stripResult(s) { var c = Object.assign({}, s); delete c.result; return c; }
   function showFindResults(result, fresh) {
@@ -740,7 +829,7 @@
     if (datesBetween(s.startDate, s.endDate).length > B.maximumDays) { toast('Show ' + B.maximumDays + ' days or fewer at a time.'); return; }
     var query = { venue: s.venue, startDate: s.startDate, endDate: s.endDate };
     var box = $('#schedResults');
-    box.innerHTML = '<div class="panel">' + loader('Opening ' + s.venue + '\'s calendar…', true) + '</div>';
+    box.innerHTML = '<div class="panel">' + loader('Opening ' + s.venue + '\'s calendar', true, 'clock') + '</div>';
     agi.react('loading', 'Opening ' + s.venue + '\'s calendar…');
     api('apiReservations', [query]).then(function (result) {
       noteUsage(result.usage);
@@ -890,6 +979,66 @@
 
   // ---------- book ----------
   var LOCAL_KEY = PRO && ACCOUNT.email ? 'heVenueProfiles:' + ACCOUNT.email : '';
+  // Filled request links kept in this browser, so a request can be prepared the day before
+  // and opened the moment the CFMO form starts taking requests.
+  var SAVED_KEY = PRO && ACCOUNT.email ? 'heSavedRequests:' + ACCOUNT.email : '';
+  var lastLink = null;
+  function readSaved() {
+    if (!SAVED_KEY) return [];
+    try { return JSON.parse(storageGet(SAVED_KEY)) || []; } catch (e) { return []; }
+  }
+  function writeSaved(list) { if (SAVED_KEY) storageSet(SAVED_KEY, JSON.stringify(list.slice(0, 30))); }
+  function saveRequest(entry) {
+    var list = readSaved().filter(function (x) { return x.url !== entry.url; });
+    list.unshift(entry);
+    writeSaved(list);
+  }
+  function savedWhen(item) {
+    if (!item.date) return '';
+    if (item.date < B.today) return 'Past';
+    if (item.date === B.today) return 'Today';
+    if (item.date === addDays(B.today, 1)) return 'Tomorrow';
+    var days = Math.round((parseISO(item.date) - parseISO(B.today)) / 86400000);
+    return 'In ' + days + ' days';
+  }
+  function requestSummary(item) {
+    var v = item.values || {};
+    return [v.eventTitle, v.venue + ', ' + shortDate(v.date) + ', ' + clock(toMinutes(v.startTime)) + ' to ' + clock(toMinutes(v.endTime)),
+      v.participants ? v.participants + ' people' : '', v.organization || '', 'Form link: ' + item.url].filter(Boolean).join('\n');
+  }
+  function copyText(text, done) {
+    var fallback = function () {
+      var t = document.createElement('textarea'); t.value = text; document.body.appendChild(t); t.select();
+      try { document.execCommand('copy'); } catch (e) {} t.remove(); done();
+    };
+    if (navigator.clipboard) navigator.clipboard.writeText(text).then(done, fallback); else fallback();
+  }
+  function drawSaved() {
+    var box = $('#savedList');
+    if (!box) return;
+    var list = readSaved();
+    $('#savedCount').textContent = list.length ? String(list.length) : '';
+    if (!list.length) {
+      box.innerHTML = '<p class="muted saved-empty">Nothing saved yet. Fill the request form, then press <strong>Save for later</strong>. Saved links stay in this browser only.</p>';
+      return;
+    }
+    var intake = F ? F.intakeStatus() : { open: false, text: '' };
+    box.innerHTML = list.map(function (item) {
+      var v = item.values || {}, when = savedWhen(item), past = when === 'Past';
+      return '<li class="saved-item' + (past ? ' is-past' : '') + '" data-id="' + esc(item.id) + '">' +
+        '<div class="saved-main"><div class="saved-top"><span class="saved-when' + (when === 'Today' || when === 'Tomorrow' ? ' soon' : '') + '">' + esc(when) + '</span>' +
+          '<span class="muted small">Saved ' + esc(new Date(item.savedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })) + '</span></div>' +
+          '<h3>' + esc(v.eventTitle || 'Untitled event') + '</h3>' +
+          '<p class="muted">' + esc(v.venue || '') + ' · ' + esc(v.date ? shortDate(v.date) : '') +
+            (v.startTime && v.endTime ? ' · ' + esc(clock(toMinutes(v.startTime)) + ' to ' + clock(toMinutes(v.endTime))) : '') + '</p></div>' +
+        '<div class="saved-actions">' +
+          '<a class="btn btn-sm' + (intake.open && !past ? ' btn-primary' : '') + '" href="' + esc(item.url) + '" target="_blank" rel="noopener"><i class="ph-bold ph-arrow-square-out" aria-hidden="true"></i>Open form</a>' +
+          '<button class="btn btn-sm" type="button" data-act="copy"><i class="ph-bold ph-copy" aria-hidden="true"></i>Copy</button>' +
+          '<button class="btn btn-sm" type="button" data-act="load"><i class="ph-bold ph-pencil-simple" aria-hidden="true"></i>Edit</button>' +
+          '<button class="link-btn" type="button" data-act="delete">Delete</button>' +
+        '</div></li>';
+    }).join('');
+  }
   try { localStorage.removeItem('heVenueRequester'); } catch (e) {}
   var profiles = mergeStores(B.profiles || {}, readLocalProfiles());
   var currentProfileId = profiles.lastUsedId || (profiles.profiles[0] && profiles.profiles[0].id) || '';
@@ -1004,13 +1153,19 @@
           '<div class="link-box" id="linkBox" hidden>' +
             '<a class="btn btn-primary" id="openForm" target="_blank" rel="noopener"><i class="ph-bold ph-arrow-square-out" aria-hidden="true"></i>Open the filled form</a>' +
             '<textarea id="linkText" readonly aria-label="Prefilled request link"></textarea>' +
-            '<button class="btn btn-sm" type="button" id="copyLink"><i class="ph-bold ph-copy" aria-hidden="true"></i>Copy link</button>' +
+            '<div class="link-actions"><button class="btn btn-sm" type="button" id="copyLink"><i class="ph-bold ph-copy" aria-hidden="true"></i>Copy link</button>' +
+            '<button class="btn btn-sm" type="button" id="saveLink"><i class="ph-bold ph-bookmark-simple" aria-hidden="true"></i>Save for later</button></div>' +
             '<ul class="link-notes"><li>Check every answer, then answer the <strong>Conforme</strong> question at the end yourself. Submitting is what books the room.</li>' +
             '<li>If the form shows old answers instead of these, Google restored a saved draft. Click <strong>Clear form</strong> at the bottom of the form, then open this link again.</li>' +
             '<li>Form says it\'s no longer accepting responses? <button type="button" class="link-btn" data-report="closed">Tell everyone it\'s closed</button></li></ul>' +
           '</div>' +
         '</aside>' +
-      '</form>' + venueDatalist() +
+      '</form>' +
+      (PRO ? '<section class="panel saved-panel" id="savedPanel"><div class="saved-head"><div><h2>Saved requests <span class="count-pill" id="savedCount"></span></h2>' +
+        '<p class="muted">Prepare a request the day before and open it when the form starts taking requests. Stored in this browser only.</p></div>' +
+        '<button class="link-btn" type="button" id="clearPast">Clear past events</button></div>' +
+        '<div class="intake saved-intake" id="savedIntake"></div><ul class="saved-list" id="savedList"></ul></section>' : '') +
+      venueDatalist() +
     '</div></div>';
 
     var form = $('#bookForm');
@@ -1033,6 +1188,43 @@
         toast('Profile deleted.');
       });
       form.addEventListener('submit', function (e) { e.preventDefault(); generateLink(); });
+      $('#saveLink').addEventListener('click', function () {
+        if (!lastLink) return;
+        saveRequest(lastLink);
+        drawSaved();
+        this.innerHTML = '<i class="ph-bold ph-check" aria-hidden="true"></i>Saved';
+        toast('Saved in this browser. Find it under Saved requests.');
+        $('#savedPanel').scrollIntoView({ behavior: REDUCED ? 'auto' : 'smooth', block: 'start' });
+      });
+      $('#savedList').addEventListener('click', function (e) {
+        var btn = e.target.closest('[data-act]');
+        if (!btn) return;
+        var li = btn.closest('.saved-item'), id = li.getAttribute('data-id');
+        var item = readSaved().filter(function (x) { return x.id === id; })[0];
+        if (!item) return;
+        var act = btn.getAttribute('data-act');
+        if (act === 'copy') copyText(requestSummary(item), function () { toast('Details and link copied.'); agi.react('copy'); });
+        if (act === 'delete') {
+          if (btn.getAttribute('data-armed') !== '1') { btn.setAttribute('data-armed', '1'); btn.textContent = 'Click again'; return; }
+          writeSaved(readSaved().filter(function (x) { return x.id !== id; }));
+          drawSaved(); toast('Removed.');
+        }
+        if (act === 'load') {
+          var v = item.values || {};
+          Object.keys(state.book).forEach(function (k) { if (v[k] !== undefined) state.book[k] = Array.isArray(v[k]) ? v[k].slice() : v[k]; });
+          if (item.profileId && findProfile(item.profileId)) currentProfileId = item.profileId;
+          renderBook();
+          window.scrollTo({ top: 0, behavior: REDUCED ? 'auto' : 'smooth' });
+          toast('Loaded into the form. Press Fill the request form for a fresh link.');
+        }
+      });
+      $('#clearPast').addEventListener('click', function () {
+        writeSaved(readSaved().filter(function (x) { return savedWhen(x) !== 'Past'; }));
+        drawSaved(); toast('Past events cleared.');
+      });
+      var si = F ? F.intakeStatus() : null;
+      if (si && si.text) { $('#savedIntake').className = 'intake saved-intake' + (si.open ? ' open' : ''); $('#savedIntake').innerHTML = '<p><i class="ph-bold ' + (si.open ? 'ph-door-open' : 'ph-clock') + '" aria-hidden="true"></i>' + esc(si.text) + '</p>'; }
+      drawSaved();
       $('#copyLink').addEventListener('click', function () {
         var t = $('#linkText'); t.select();
         var done = function () { toast('Link copied.'); agi.react('copy'); };
@@ -1258,7 +1450,7 @@
       setStatus('blocked', '<strong><i class="ph-bold ph-lock-simple" aria-hidden="true"></i>Out of free checks today</strong>They reset at midnight. <a href="#/access" data-nav>Pro</a> checks as often as you need.');
       return;
     }
-    setStatus('', '<strong><i class="ph-bold ph-hourglass" aria-hidden="true"></i>Reading the room\'s calendar</strong>One moment.');
+    setStatus('', '<strong>' + ART.spin + 'Reading the room\'s calendar</strong>One moment.');
     var args = [s.venue, s.date];
     api('apiVenueDay', args).then(function (day) {
       noteUsage(day.usage);
@@ -1345,11 +1537,18 @@
     values.contactNumber = String(values.contactNumber).replace(/[\s()-]/g, '').replace(/^\+?63/, '').replace(/^0/, '');
     saveCurrentProfile(values);
     var btn = $('#generate');
-    btn.disabled = true;
+    btn.disabled = true; btn.classList.add('is-busy');
     agi.react('loading', 'Filling in the form…');
+    $('#linkBox').hidden = true;
+    var pending = document.createElement('div');
+    pending.className = 'form-pending';
+    pending.innerHTML = loader('Filling in the CFMO form', false, 'form');
+    btn.insertAdjacentElement('afterend', pending);
     api('apiBuildRequestLink', [values]).then(function (result) {
       noteUsage(result.usage);
       $('#openForm').href = result.url;
+      lastLink = { id: String(Date.now()), url: result.url, savedAt: Date.now(), date: values.date, profileId: currentProfileId, values: values };
+      $('#saveLink').innerHTML = '<i class="ph-bold ph-bookmark-simple" aria-hidden="true"></i>Save for later';
       $('#linkText').value = result.url;
       $('#linkBox').hidden = false;
       $('#openForm').focus();
@@ -1359,7 +1558,7 @@
       err.textContent = friendlyError(error);
       err.hidden = false;
       agi.react(errorCode(error) ? 'limit' : 'error');
-    }).then(function () { btn.disabled = false; });
+    }).then(function () { btn.disabled = false; btn.classList.remove('is-busy'); pending.remove(); });
   }
 
   // ---------- plan & access ----------
@@ -1455,7 +1654,7 @@
   }
   function busy(btn, text) {
     // Disable after the submit has started, or the browser drops the post.
-    setTimeout(function () { btn.disabled = true; btn.lastChild.textContent = text; }, 0);
+    setTimeout(function () { btn.disabled = true; btn.classList.add('is-busy'); btn.lastChild.textContent = text; }, 0);
   }
   // Result of a form post, shown once after the page reloads.
   function showFlash() {

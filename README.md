@@ -28,6 +28,7 @@ Booking a room used to mean opening CFMO calendars one at a time, writing down t
 | **Schedule** | One room's bookings across several days, with the free time between them. Events that run past midnight or last several hours are split cleanly per day. |
 | **Venues** | All 152 rooms with capacity, air-con and AV equipment where CFMO has it on file. |
 | **Book** | Every question on the CFMO request form, checked against CFMO's rules before you open it, then sent as a prefilled link. Saved org profiles mean you only type your details once. |
+| **Saved requests** | Pro users can save a filled form link in their browser, prepare it the day before, and open it the moment the CFMO form starts taking requests. The home page reminds them when one is due today or tomorrow. |
 | **Form status** | Warns you when the CFMO form is outside intake hours, has hit its 60-a-day limit, or is closed, so you don't fill it in for nothing. |
 | **Report an issue** | Sends a bug report or idea to the maintainer by email and logs it in the backend sheet. |
 
@@ -44,7 +45,6 @@ Booking a room used to mean opening CFMO calendars one at a time, writing down t
 
 It works on phones, has a dark mode, and comes with a small pet mascot that naps, wanders around and gets dizzy if you spin it.
 
-<p align="center"><img src="docs/screenshots/mobile.png" alt="Venue Explorer on a phone" width="300"></p>
 
 ## Plans
 
@@ -63,13 +63,6 @@ Students request a key from the **Plan** page. The request lands in the backend 
 ## Emails
 
 Every email is table-based HTML with inline styles, so it looks the same in Gmail, Apple Mail and Outlook. Gmail strips SVG and embedded images, so the logo is drawn with table cells. Each email also has a plain-text version.
-
-<table>
-<tr>
-<td width="50%"><img src="docs/screenshots/email-key.png" alt="Pro key email"></td>
-<td width="50%"><img src="docs/screenshots/email-issue.png" alt="Issue report email"></td>
-</tr>
-</table>
 
 Five emails in total: Pro request (to the owner), request received (to the student), Pro key, issue report, and the reporter's copy.
 
