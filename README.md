@@ -26,9 +26,9 @@ Booking a room used to mean opening CFMO calendars one at a time, writing down t
 
 | | |
 |---|---|
-| **Find a slot** | Search every room at once for a date range. Filter by type, building, headcount, air-con and equipment, or look for a specific time window, like "free from 1 to 3 PM". |
+| **Find a slot** | Search every room at once for a date range. Filter by type, building, headcount, aircon and equipment, or look for a specific time window, like "free from 1 to 3 PM". |
 | **Schedule** | One room's bookings across several days, with the free time between them. Events that run past midnight or last several hours are split cleanly per day. |
-| **Venues** | All 152 rooms with capacity, air-con and AV equipment where CFMO has it on file. |
+| **Venues** | All 152 rooms with capacity, aircon and AV equipment where CFMO has it on file. |
 | **Book** | Every question on the CFMO request form, checked against CFMO's rules before you open it, then sent as a prefilled link. Saved org profiles mean you only type your details once. |
 | **Saved requests** | Pro users can save a filled form link in their browser, prepare it the day before, and open it the moment the CFMO form starts taking requests. The home page reminds them when one is due today or tomorrow. |
 | **Form status** | Warns you when the CFMO form is outside intake hours, has hit its 60-a-day limit, or is closed, so you don't fill it in for nothing. |

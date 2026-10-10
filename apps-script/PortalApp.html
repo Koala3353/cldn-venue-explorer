@@ -384,8 +384,8 @@
   function venueFacts(v) {
     var out = [];
     if (v.capacity) out.push('<span class="badge"><i class="ph-bold ph-users" aria-hidden="true"></i>' + v.capacity + '</span>');
-    if (v.airCon === 'Yes') out.push('<span class="badge badge-ok"><i class="ph-bold ph-snowflake" aria-hidden="true"></i>Air-con</span>');
-    if (v.airCon === 'No') out.push('<span class="badge">No air-con</span>');
+    if (v.airCon === 'Yes') out.push('<span class="badge badge-ok"><i class="ph-bold ph-snowflake" aria-hidden="true"></i>Aircon</span>');
+    if (v.airCon === 'No') out.push('<span class="badge">No aircon</span>');
     return out.join('');
   }
   function venueDatalist() {
@@ -445,7 +445,7 @@
         '<p class="eyebrow">What it does</p>' +
         '<h2 class="section-title">The booking chores, done for you.</h2>' +
         '<p class="section-lead">Most bookings take about two minutes, from search to a filled-in CFMO form.</p>' +
-        feature(1, 'find', 'Find a free slot', 'Search every room for a day at once, or two weeks on Pro. Filter by building, headcount, air-con or an exact window like 1 to 3 PM. Every result is a gap in that room\'s CFMO calendar.', 'Find a slot', FEATURE_ART.find) +
+        feature(1, 'find', 'Find a free slot', 'Search every room for a day at once, or two weeks on Pro. Filter by building, headcount, aircon or an exact window like 1 to 3 PM. Every result is a gap in that room\'s CFMO calendar.', 'Find a slot', FEATURE_ART.find) +
         feature(2, 'schedule', 'See a room\'s week', 'Open one room and read its bookings day by day, with the free time between them. A three-hour event shows once, not three times.', 'Open a schedule', FEATURE_ART.schedule) +
         feature(3, 'book', 'Book without retyping', 'On Pro, pick a slot and the CFMO request form opens with your org, contact details and event already in it. The room\'s calendar is read again first, so a clash shows up before you send.', 'Book a room', FEATURE_ART.book) +
         feature(4, 'book', 'Know if the form is open', 'CFMO only takes requests during intake hours, and only the first 60 a day. The Book page tells you which it is before you start typing.', 'Check the form', FEATURE_ART.status) +
@@ -607,7 +607,7 @@
             [['30', '30 min+'], ['60', '1 hour+'], ['120', '2 hours+'], ['180', '3 hours+'], ['240', '4 hours+']].map(function (o) {
               return '<option value="' + o[0] + '"' + (String(s.minFree) === o[0] ? ' selected' : '') + '>' + o[1] + '</option>';
             }).join('') + '</select></label>' +
-          '<div class="field"><span>Air-con</span><label class="switch"><input type="checkbox" name="airCon"' + (s.airCon ? ' checked' : '') + '>Needed</label></div>' +
+          '<div class="field"><span>Aircon</span><label class="switch"><input type="checkbox" name="airCon"' + (s.airCon ? ' checked' : '') + '>Needed</label></div>' +
           '<button class="btn btn-primary" type="submit"><i class="ph-bold ph-magnifying-glass" aria-hidden="true"></i>Search</button>' +
         '</div>' +
         '<details class="more"' + (open ? ' open' : '') + '><summary><i class="ph-bold ph-sliders-horizontal" aria-hidden="true"></i>More options' +
@@ -749,7 +749,7 @@
     });
     var notes = [];
     if (result.failed.length) notes.push(plural(result.failed.length, 'calendar') + ' could not be read');
-    if (result.skippedNoSpecs) notes.push(result.skippedNoSpecs + ' skipped because their size, equipment or air-con isn\'t on file');
+    if (result.skippedNoSpecs) notes.push(result.skippedNoSpecs + ' skipped because their size, equipment or aircon isn\'t on file');
     var timeText = time.mode === 'exact' ? 'free ' + clock(time.from) + ' to ' + clock(time.to)
       : time.mode === 'window' ? 'between ' + clock(time.from) + ' and ' + clock(time.to) : '';
     if (!slots.length) {
@@ -837,7 +837,7 @@
       s.result = result;
       if (box.isConnected) {
         var count = showSchedule(result);
-        agi.react(count ? 'success' : 'free', count ? 'Here you go. Free gaps are in blue.' : 'No bookings at all. Wide open!');
+        agi.react(count ? 'success' : 'free', count ? 'Here you go. The free gaps are highlighted.' : 'No bookings at all. Wide open!');
       }
     }).catch(function (error) {
       if (box.isConnected) box.innerHTML = '<div class="panel">' + failureBlock(error, reloadUrl('apiReservations', [query], 'schedule', stripResult(s))) + '</div>';
@@ -899,10 +899,10 @@
   }
   function specList(v) {
     if (!v.hasSpecs) return '<dl class="spec-list">' + (v.building ? '<dt>Building</dt><dd>' + esc(v.building) + '</dd>' : '') + '</dl>' +
-      '<p class="muted small" style="margin-bottom:16px">Size, equipment and air-con are not on file for this room.</p>';
+      '<p class="muted small" style="margin-bottom:16px">Size, equipment and aircon are not on file for this room.</p>';
     var rows = [['Building', v.building + (v.floor ? ', ' + v.floor : '')], ['Facility', v.facility],
       ['Capacity', v.capacity ? v.capacity + (v.capacityNote ? ' (' + v.capacityNote + ')' : '') : 'Not listed'],
-      ['Air-con', v.airCon || 'Not listed'], ['Equipment', v.equipment]];
+      ['Aircon', v.airCon || 'Not listed'], ['Equipment', v.equipment]];
     return '<dl class="spec-list">' + rows.filter(function (r) { return r[1]; }).map(function (r) {
       return '<dt>' + r[0] + '</dt><dd>' + esc(r[1]) + '</dd>';
     }).join('') + '</dl>';
@@ -918,7 +918,7 @@
         '<label class="field"><span>Search</span><input class="input" id="vq" type="search" placeholder="Room, building or equipment" value="' + esc(s.q) + '"></label>' +
         '<label class="field"><span>Building</span><select class="input" id="vb">' + buildingOptions(s.building) + '</select></label>' +
         '<label class="field"><span>People</span><input class="input num" id="vc" type="number" min="0" placeholder="Any" value="' + esc(s.minCapacity) + '"></label>' +
-        '<div class="field"><span>Air-con</span><label class="switch"><input type="checkbox" id="va"' + (s.airCon ? ' checked' : '') + '>Needed</label></div>' +
+        '<div class="field"><span>Aircon</span><label class="switch"><input type="checkbox" id="va"' + (s.airCon ? ' checked' : '') + '>Needed</label></div>' +
       '</div>' +
       '<div class="type-pills" role="group" aria-label="Venue type">' +
         '<button class="chip" data-type="" aria-pressed="' + (!s.type) + '">All <span class="num">' + VENUES.length + '</span></button>' +

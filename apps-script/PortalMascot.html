@@ -242,12 +242,12 @@ window.Agi = (function () {
   ];
   var route = (location.hash || '').replace(/^#\/?/, '').split(/[?\/]/)[0];
   var PAGE_TIPS = {
-    '': ['The "Free right now" list updates every time you open this page.', 'Tap a room on the right to see its schedule.',
-      'Pro is free. Ask for a key on the Plan page.', 'Two minutes is all a booking takes once your org is saved.'],
+    '': ['The "Free right now" list updates every time you open this page.', 'Tap a room in "Free right now" to start booking it.',
+      'Pro is free. Ask for a key on the Plan page.', 'Once your org is saved, a booking takes about two minutes.'],
     find: ['Open "More options" to search an exact window, like 1 to 3 PM.', 'Set "People" so tiny rooms drop out of the list.',
-      'Sort by longest gap if your event runs long.', 'Click a free time to carry it straight into Book.', 'Pro can search 14 days at once.',
-      'Turn on Air-con if it\'s a hot day. Trust me.'],
-    schedule: ['Grey blocks are bookings. The gaps between are yours.', 'A long event shows once per day, not once per hour.',
+      'Long event? Sort by "Longest free time".', 'Click a free time to carry it straight into Book.', 'Pro can search 14 days at once.',
+      'Turn on Aircon if it\'s a hot day. Trust me.'],
+    schedule: ['The highlighted rows are free. Everything else is booked.', 'A long event shows once per day, not once per hour.',
       'Pick a date range to see a room\'s whole week.', 'Click a gap to book that exact time.'],
     venues: ['Use the chips to filter by venue type.', 'Search works on equipment too. Try "mic" or "projector".',
       '"Specs not on file" means CFMO hasn\'t listed the room\'s details.', 'Each card has Schedule and Book shortcuts.'],
@@ -258,8 +258,8 @@ window.Agi = (function () {
     access: ['Your key only works with your own account.', 'Pro keys are emailed once they\'re approved.', 'Lost your key? Report an issue and I\'ll pass it on.'],
     report: ['Screenshots help. Paste a Drive link in your message.', 'Turn on technical details if something broke.'],
   };
-  var CHATTER = ['Did you know HE has 152 bookable rooms? I\'ve napped in most.', 'I tried booking a room for myself. CFMO said no.',
-    'Fun fact: I\'m powered by spreadsheets.', 'If a room is free, it\'s free. That\'s my whole philosophy.', 'Remember to drink water.',
+  var CHATTER = ['HE has 152 bookable rooms. I\'ve napped in most of them.', 'I tried booking a room for myself. CFMO said no.',
+    'Fun fact: I\'m powered by spreadsheets.', 'Free room, happy bird.', 'Remember to drink water.',
     'You\'re doing great. Probably.', 'Is it lunch yet?', 'I counted the chairs in CTC 205. Lost count at 4.',
     'Somewhere, a projector isn\'t working. Not my fault.', 'Every room has a story. Most are about org GAs.',
     'Don\'t forget your approver\'s name!', 'Psst. You can drag me around.', 'Rub my head. Go on.', 'Plan early, book early, sleep well.'];
@@ -271,8 +271,8 @@ window.Agi = (function () {
   }
   var TIPS = [
     'Click a time in the results to start a booking.',
-    'Schedules show the free gaps between bookings in blue.',
-    'Need a room at an exact time? Open "More options" on Find.',
+    'Schedules highlight the free time between bookings.',
+    'For an exact time, open "More options" on Find.',
     'The venue list syncs with the CFMO site every day.',
     'You can drag me anywhere. Rub me for scritches.',
     'I check the room\'s calendar again right before you book.',
