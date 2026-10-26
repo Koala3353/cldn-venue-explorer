@@ -74,7 +74,10 @@ function onOpen() {
       .addItem('Send keys to approved requests', 'sendKeysToApprovedRequests')
       .addItem('Revoke a person\'s access…', 'revokeAccess')
       .addSeparator()
-      .addItem('Email me sample emails', 'sendEmailPreviews'))
+      .addItem('Email me sample emails', 'sendEmailPreviews')
+      .addSeparator()
+      .addItem('Turn daily activity email on or off', 'toggleActivityReport')
+      .addItem('Email me today\'s activity now', 'sendActivityReportNow'))
     .addToUi();
 }
 

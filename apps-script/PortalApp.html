@@ -293,6 +293,11 @@
   var LAST_ERROR = '';
   function rememberError(error) {
     LAST_ERROR = ((current ? (ROUTE_NAMES[current] || current) + ': ' : '') + ((error && error.message) || String(error || ''))).slice(0, 300);
+    // Server errors are logged where they happen; this catches calls that never got there.
+    var msg = String((error && error.message) || error || '');
+    if (!/^(LIMIT|PRO|ACCESS):/.test(msg) && window.google && google.script && google.script.run) {
+      try { google.script.run.withFailureHandler(function () {}).apiLogClientError(msg.slice(0, 300), ROUTE_NAMES[current] || current || 'Home'); } catch (e) {}
+    }
   }
   var ROUTE_NAMES = { '': 'Home', find: 'Find a slot', schedule: 'Schedule', venues: 'Venues', book: 'Book', access: 'Plan', report: 'Report' };
   function failureBlock(error, retryUrl) {

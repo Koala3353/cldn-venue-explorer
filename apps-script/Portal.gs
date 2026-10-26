@@ -193,7 +193,7 @@ function portalRegistry_(ss) {
  * timeMode 'exact' keeps rooms free for the whole fromTime-toTime slot.
  * timeMode 'window' keeps free time inside fromTime-toTime that lasts at least minFree minutes.
  */
-function apiAvailability(query) {
+function searchSlots_(query) {
   query = query || {};
   const account = requireAccount_();
   const ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -295,7 +295,7 @@ function availabilityWindow_(query, settings) {
  * Bookings for one venue, already split per day.
  * query: { venue, startDate, endDate }
  */
-function apiReservations(query) {
+function venueSchedule_(query) {
   const account = requireAccount_();
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const settings = readSettings_(ss);
@@ -315,7 +315,7 @@ function apiReservations(query) {
 
 
 /** One venue's bookings on one day, for the request availability check. */
-function apiVenueDay(venueName, dateText) {
+function venueDayCheck_(venueName, dateText) {
   const account = requireAccount_();
   const day = getVenueDay_(venueName, dateText);
   day.usage = consume_(account, 'check');
@@ -364,7 +364,7 @@ function apiSaveProfiles(store) {
 
 
 /** Pro: builds the prefilled request form link on the server. */
-function apiBuildRequestLink(request) {
+function requestLink_(request) {
   const account = requireAccount_();
   if (account.plan !== 'pro') throw new Error('PRO:link');
   const values = readRequestValues_(request || {});

@@ -354,3 +354,114 @@ function sendEmailPreviews() {
   });
   SpreadsheetApp.getActiveSpreadsheet().toast('Sent 5 sample emails to ' + to + '.', 'Email previews', 6);
 }
+
+
+/** Owner's daily digest of portal activity. rows follow ACTIVITY.header. */
+function emailActivityReport_(rows, from, to) {
+  const E = EMAIL;
+  const tz = Session.getScriptTimeZone();
+  const fmt = function (d, p) { return Utilities.formatDate(d, tz, p); };
+  const by = function (kind) { return rows.filter(function (r) { return r[3] === kind; }); };
+  const links = by('link'), searches = by('search'), schedules = by('schedule'), checks = by('check');
+  const errors = rows.filter(function (r) { return r[4] === 'error'; });
+  const refused = rows.filter(function (r) { return r[4] === 'refused'; });
+  const outside = links.filter(function (r) { return r[4] === 'ok' && r[8] === 'Yes'; });
+  const people = {};
+  rows.forEach(function (r) { people[r[1]] = true; });
+  const peopleCount = Object.keys(people).length;
+
+  function stat(n, label, tone) {
+    return '<td width="25%" style="padding:14px 10px;text-align:center;border-radius:14px;background:' + (tone ? E.limeSoft : E.sunk) + '">' +
+      '<p style="margin:0;font:800 26px/1 ' + E.font + ';color:' + (tone ? E.limeText : E.navy) + '">' + n + '</p>' +
+      '<p style="margin:6px 0 0;font:600 11px/1.3 ' + E.font + ';color:' + E.muted + ';text-transform:uppercase;letter-spacing:.05em">' + emailText_(label) + '</p></td>';
+  }
+  function heading(text) {
+    return '<p style="margin:22px 0 8px;font:700 12px/1 ' + E.font + ';letter-spacing:.06em;text-transform:uppercase;color:' + E.muted + '">' + emailText_(text) + '</p>';
+  }
+  function list(items) {
+    return '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:' + E.sunk + ';border-radius:16px;margin:0 0 6px">' +
+      '<tr><td style="padding:4px 18px">' + items.map(function (it, i) {
+        return '<div style="padding:11px 0;' + (i ? 'border-top:1px solid ' + E.line + ';' : '') + '">' +
+          '<p style="margin:0;font:700 14px/1.4 ' + E.font + ';color:' + E.navy + '">' + it.title + '</p>' +
+          (it.sub ? '<p style="margin:3px 0 0;font:500 13px/1.5 ' + E.font + ';color:' + E.ink2 + ';word-break:break-word">' + it.sub + '</p>' : '') + '</div>';
+      }).join('') + '</td></tr></table>';
+  }
+  function flag(text, bad) {
+    return '<span style="display:inline-block;padding:2px 8px;border-radius:99px;font:700 11px/1.5 ' + E.font + ';background:' +
+      (bad ? E.badSoft : E.limeSoft) + ';color:' + (bad ? E.bad : E.limeText) + '">' + emailText_(text) + '</span>';
+  }
+  const when = function (r) { return fmt(r[0], 'EEE h:mm a'); };
+
+  let body = '<table role="presentation" width="100%" cellpadding="0" cellspacing="6" border="0" style="margin:0 -6px 6px"><tr>' +
+    stat(peopleCount, peopleCount === 1 ? 'person' : 'people') + stat(searches.length + schedules.length, 'lookups') +
+    stat(links.length, 'autofills') + stat(outside.length, 'outside Celadon', outside.length > 0) + '</tr></table>';
+
+  if (links.length) {
+    body += heading('Form autofills');
+    body += list(links.map(function (r) {
+      const org = r[7] || 'No organization';
+      return {
+        title: emailText_(org) + ' &nbsp;' + (r[4] !== 'ok' ? flag(r[4] === 'refused' ? 'Refused' : 'Failed', true) : r[8] === 'Yes' ? flag('Outside Celadon', true) : flag('Celadon')),
+        sub: emailText_(r[1]) + ' · ' + emailText_(r[5]) + ' · ' + emailText_(r[6]) + (r[9] ? '<br>' + emailText_(r[9]) : '') + '<br>' + emailText_(when(r)),
+      };
+    }));
+  }
+
+  const lookups = searches.concat(schedules, checks);
+  if (lookups.length) {
+    body += heading('Searches and schedules by person');
+    const perPerson = {};
+    lookups.forEach(function (r) { (perPerson[r[1]] = perPerson[r[1]] || []).push(r); });
+    body += list(Object.keys(perPerson).sort().map(function (email) {
+      const mine = perPerson[email];
+      const venues = {};
+      mine.forEach(function (r) { if (r[5]) venues[r[5]] = true; });
+      const lines = mine.slice(0, 8).map(function (r) {
+        return emailText_(when(r)) + ' · ' + emailText_(ACTIVITY.kinds[r[3]] || r[3]) + (r[5] ? ' · ' + emailText_(r[5]) : '') +
+          (r[6] ? ' · ' + emailText_(r[6]) : '') + (r[3] === 'search' && r[9] ? ' · ' + emailText_(r[9]) : '');
+      });
+      if (mine.length > 8) lines.push('…and ' + (mine.length - 8) + ' more in the Activity tab');
+      return {
+        title: emailText_(email) + ' &nbsp;<span style="font-weight:500;color:' + E.muted + '">' + mine.length + ' lookup' + (mine.length === 1 ? '' : 's') +
+          (mine[0][2] === 'pro' ? ' · Pro' : ' · Free') + '</span>',
+        sub: (Object.keys(venues).length ? 'Venues: ' + emailText_(Object.keys(venues).join(', ')) + '<br>' : '') + lines.join('<br>'),
+      };
+    }));
+  }
+
+  if (errors.length) {
+    body += heading('Errors');
+    body += list(errors.slice(0, 15).map(function (r) {
+      return { title: emailText_(ACTIVITY.kinds[r[3]] || r[3]) + ' · ' + emailText_(r[1]), sub: emailText_(when(r)) + '<br>' + emailText_(r[9]) };
+    }));
+  }
+  if (refused.length) {
+    body += '<p style="margin:14px 0 0;font:500 13px/1.5 ' + E.font + ';color:' + E.ink2 + '">' + refused.length +
+      ' request' + (refused.length === 1 ? ' was' : 's were') + ' turned away for hitting a daily limit or a Pro-only feature.</p>';
+  }
+
+  const range = fmt(from, 'EEE d MMM, h:mm a') + ' to ' + fmt(to, 'h:mm a');
+  const subjectBits = [peopleCount + (peopleCount === 1 ? ' person' : ' people'), links.length + ' autofill' + (links.length === 1 ? '' : 's')];
+  if (outside.length) subjectBits.push(outside.length + ' outside Celadon');
+  if (errors.length) subjectBits.push(errors.length + ' error' + (errors.length === 1 ? '' : 's'));
+
+  const html = emailLayout_({
+    preheader: subjectBits.join(', '),
+    badge: outside.length ? 'Check autofills' : errors.length ? 'Errors today' : 'Daily activity',
+    badgeTone: outside.length || errors.length ? 'bad' : 'ok',
+    title: 'Portal activity, ' + fmt(to, 'EEE d MMM'),
+    intro: 'Everything people did on HE Venue Explorer from ' + emailText_(range) + '.',
+    body: body,
+    note: 'Every row is in the Activity tab of the access sheet. Autofills count as Celadon when the organization or event title mentions ' +
+      ACTIVITY.homeOrgs.join(' or ') + '.',
+  });
+
+  const text = ['Portal activity, ' + fmt(to, 'EEE d MMM') + ' (' + range + ')', subjectBits.join(', '), '',
+    'FORM AUTOFILLS'].concat(links.length ? links.map(function (r) {
+      return '- ' + (r[7] || 'No organization') + (r[8] === 'Yes' ? ' [OUTSIDE CELADON]' : '') + ' | ' + r[1] + ' | ' + r[5] + ' ' + r[6] + ' | ' + r[4];
+    }) : ['- none'], ['', 'LOOKUPS'], lookups.length ? lookups.map(function (r) {
+      return '- ' + when(r) + ' ' + r[1] + ' ' + (ACTIVITY.kinds[r[3]] || r[3]) + ' ' + r[5] + ' ' + r[6];
+    }) : ['- none'], ['', 'ERRORS'], errors.length ? errors.map(function (r) { return '- ' + when(r) + ' ' + r[1] + ' ' + r[9]; }) : ['- none']).join('\n');
+
+  return { subject: 'HE Venue Explorer activity, ' + fmt(to, 'd MMM') + ': ' + subjectBits.join(', '), html: html, text: text };
+}

@@ -32,6 +32,7 @@ Booking a room used to mean opening CFMO calendars one at a time, writing down t
 | **Book** | Every question on the CFMO request form, checked against CFMO's rules before you open it, then sent as a prefilled link. Saved org profiles mean you only type your details once. |
 | **Saved requests** | Pro users can save a filled form link in their browser, prepare it the day before, and open it the moment the CFMO form starts taking requests. The home page reminds them when one is due today or tomorrow. |
 | **Form status** | Warns you when the CFMO form is outside intake hours, has hit its 60-a-day limit, or is closed, so you don't fill it in for nothing. |
+| **Daily activity report** | Every search, schedule, calendar check, form autofill and error is logged to an Activity tab. At 9 PM the owner gets one email covering the day, with autofills for orgs outside Celadon flagged. Days with no activity send nothing. |
 | **Report an issue** | Sends a bug report or idea to the maintainer by email and logs it in the backend sheet. |
 
 <table>
@@ -77,7 +78,8 @@ apps-script/
 ├── Code.gs            Sheet menu, calendar reads, free-slot maths, CFMO form schema and checks
 ├── Portal.gs          Web app: doGet / doPost, the api* functions the page calls
 ├── Access.gs          Plans, daily limits, access keys, key requests, issue reports
-├── Emails.gs          HTML email layout and the five emails
+├── Activity.gs        Logs every lookup, autofill and error; sends the owner's daily report
+├── Emails.gs          HTML email layout and every email the project sends
 ├── Setup.gs           buildWorkbook(): builds and styles every sheet tab
 ├── PortalPage.html    Page shell
 ├── PortalApp.html     Client app (routing, pages, loaders)
