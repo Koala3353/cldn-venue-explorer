@@ -72,6 +72,7 @@ function onOpen() {
       .addItem('Open access backend', 'openAccessBackend')
       .addItem('Generate access keys…', 'generateAccessKeys')
       .addItem('Send keys to approved requests', 'sendKeysToApprovedRequests')
+      .addItem('Send keys when I pick Approve in the access sheet', 'enableApproveInSheet')
       .addItem('Revoke a person\'s access…', 'revokeAccess')
       .addSeparator()
       .addItem('Email me sample emails', 'sendEmailPreviews')

@@ -208,7 +208,7 @@ function emailAccessRequestToOwner_(account, request, backendUrl) {
     ]) + emailQuote_(request.purpose, 'What they need it for') +
       emailSteps_([
         'Open the <strong style="color:' + EMAIL.navy + '">Requests</strong> tab and set Status to <strong style="color:' + EMAIL.navy + '">Approve</strong>.',
-        'In the sheet, use <strong style="color:' + EMAIL.navy + '">Access keys &rsaquo; Send keys to approved requests</strong>. The key is emailed to them.',
+        'That\'s it. The key is emailed to them within a few seconds and the row changes to <strong style="color:' + EMAIL.navy + '">Sent</strong>.',
       ]),
     cta: backendUrl ? { label: 'Open the Requests tab', url: backendUrl } : null,
   });
@@ -217,8 +217,7 @@ function emailAccessRequestToOwner_(account, request, backendUrl) {
     'Name: ' + request.name, 'Account: ' + account.email, 'Organization: ' + request.organization,
     'Role: ' + (request.role || '-'), 'Contact number: ' + (request.contact || '-'), '',
     'What they need it for:', request.purpose, '',
-    'To approve: open the Requests tab, set Status to Approve, then use',
-    'Access keys > Send keys to approved requests.', backendUrl || '',
+    'To approve: open the Requests tab and set Status to Approve. The key is emailed to them right away.', backendUrl || '',
   ].join('\n');
   return { subject: 'Pro request: ' + request.name + ' (' + request.organization + ')', html: html, text: text };
 }

@@ -446,6 +446,7 @@ function setupAccessBackend() {
   ss.getSheetByName(ACCESS.sheets.requests).getRange('H2:H').setDataValidation(SpreadsheetApp.newDataValidation()
     .requireValueInList(ACCESS.requestStatus, true).setAllowInvalid(false).build());
 
+  installApprovalTrigger_();
   showLinkDialog_('Access backend ready',
     'The private access sheet is set up. Keep it unshared.', ss.getUrl(), 'Open the access sheet');
 }
@@ -489,27 +490,83 @@ function sendKeysToApprovedRequests() {
   const last = sheet.getLastRow();
   if (last < 2) { SpreadsheetApp.getActiveSpreadsheet().toast('No requests yet.', 'Access keys', 5); return; }
   const rows = sheet.getRange(2, 1, last - 1, 10).getValues();
-  const portalUrl = ScriptApp.getService().getUrl();
   let sent = 0, skipped = 0;
-
   rows.forEach(function (row, i) {
-    if (row[7] !== 'Approve' || row[8]) return;
-    const email = normalizedText_(row[1]).toLowerCase();
-    if (!email.endsWith('@' + ACCESS.domain) || proStatus_(email)) {
-      sheet.getRange(i + 2, 8, 1, 3).setValues([['Declined', '', 'Skipped: not a student account or already Pro']]);
-      skipped++;
-      return;
-    }
-    const made = createKey_(email, 'Request from ' + row[2]);
-    const mail = emailAccessKey_(row[2], email, made.key, portalUrl);
-    const notify = PropertiesService.getScriptProperties().getProperty(ACCESS.properties.notify) || ACCESS.defaultNotifyEmail;
-    sendDesignedEmail_({ to: email, replyTo: notify, subject: mail.subject, html: mail.html, text: mail.text });
-    sheet.getRange(i + 2, 8, 1, 2).setValues([['Sent', made.keyId]]);
-    logAccess_('key-sent', email, made.keyId);
-    sent++;
+    const result = sendKeyForRow_(sheet, i + 2, row);
+    if (result === 'sent') sent++;
+    if (result === 'skipped') skipped++;
   });
   SpreadsheetApp.getActiveSpreadsheet().toast(
     sent + ' key(s) sent' + (skipped ? ', ' + skipped + ' skipped' : '') + '.', 'Access keys', 8);
+}
+
+
+/** Emails a key for one Requests row marked Approve. Returns 'sent', 'skipped' or ''. */
+function sendKeyForRow_(sheet, rowNumber, row) {
+  if (row[7] !== 'Approve' || row[8]) return '';
+  const email = normalizedText_(row[1]).toLowerCase();
+  if (!email.endsWith('@' + ACCESS.domain) || proStatus_(email)) {
+    sheet.getRange(rowNumber, 8, 1, 3).setValues([['Declined', '', 'Skipped: not a student account or already Pro']]);
+    return 'skipped';
+  }
+  const made = createKey_(email, 'Request from ' + row[2]);
+  const mail = emailAccessKey_(row[2], email, made.key, ScriptApp.getService().getUrl());
+  const notify = PropertiesService.getScriptProperties().getProperty(ACCESS.properties.notify) || ACCESS.defaultNotifyEmail;
+  sendDesignedEmail_({ to: email, replyTo: notify, subject: mail.subject, html: mail.html, text: mail.text });
+  sheet.getRange(rowNumber, 8, 1, 3).setValues([['Sent', made.keyId,
+    'Key emailed ' + Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'd MMM yyyy, h:mm a')]]);
+  logAccess_('key-sent', email, made.keyId);
+  return 'sent';
+}
+
+
+/**
+ * Edit trigger on the access sheet: picking Approve in a Requests row emails
+ * that person their key straight away, so approving never leaves the sheet.
+ */
+function onAccessSheetEdit(e) {
+  const range = e && e.range;
+  if (!range) return;
+  const sheet = range.getSheet();
+  if (sheet.getName() !== ACCESS.sheets.requests || range.getColumn() > 8 || range.getLastColumn() < 8 || range.getRow() < 2) return;
+  const lock = LockService.getScriptLock();
+  if (!lock.tryLock(20000)) return;
+  try {
+    const first = range.getRow(), count = range.getNumRows();
+    const rows = sheet.getRange(first, 1, count, 10).getValues();
+    rows.forEach(function (row, i) {
+      try {
+        sendKeyForRow_(sheet, first + i, row);
+      } catch (error) {
+        sheet.getRange(first + i, 10).setValue('Could not send: ' + error.message);
+      }
+    });
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+
+/** Adds the edit trigger above to the access sheet. Safe to run more than once. */
+function installApprovalTrigger_() {
+  const id = PropertiesService.getScriptProperties().getProperty(ACCESS.properties.sheetId);
+  if (!id) return false;
+  const exists = ScriptApp.getProjectTriggers().some(function (t) {
+    return t.getHandlerFunction() === 'onAccessSheetEdit' && t.getTriggerSourceId() === id;
+  });
+  if (!exists) ScriptApp.newTrigger('onAccessSheetEdit').forSpreadsheet(id).onEdit().create();
+  const sheet = SpreadsheetApp.openById(id).getSheetByName(ACCESS.sheets.requests);
+  if (sheet) sheet.getRange('H1').setNote('Pick Approve to email this person their key right away. The row then changes to Sent.');
+  return true;
+}
+
+/** Owner menu: turns on sending keys straight from the access sheet. */
+function enableApproveInSheet() {
+  assertOwner_();
+  const ok = installApprovalTrigger_();
+  const text = ok ? 'Done. In the access sheet, pick Approve in a request\'s Status and the key is emailed right away.'
+    : 'Run Access keys > Set up access backend first.';
+  try { SpreadsheetApp.getUi().alert(text); } catch (e) { console.log(text); }
 }
 
 

@@ -61,7 +61,7 @@ Everyone with a school account gets Free. Pro is unlocked with a one-person acce
 | Prefilled CFMO links | – | 150 / day |
 | Saved org profiles | – | ✓ |
 
-Students request a key from the **Plan** page. The request lands in the backend sheet and the owner gets an email. Once it's marked *Approve*, **Send keys to approved requests** emails each student their key. Keys are stored hashed and are tied to the account that redeems them.
+Students request a key from the **Plan** page. The request lands in the backend sheet and the owner gets an email. Picking *Approve* in that row emails the student their key straight away, and the row changes to *Sent*. Keys are stored hashed and are tied to the account that redeems them.
 
 ## Emails
 
